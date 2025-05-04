@@ -1,129 +1,175 @@
 <?php
 
-namespace Tests\Unit;
+namespace Tests\Feature;
 
 use Tests\TestCase;
 use App\Models\Product;
 use App\Models\Supplier;
-use App\Models\Inventory;
 use App\Models\Admin;
-use App\Http\Controllers\ProductController;
+use App\Models\Inventory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\Request;
-use Exception;
+use Illuminate\Foundation\Testing\WithFaker;
 
 class ProductControllerTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, WithFaker;
 
-    private ProductController $controller;
+    private string $baseUrl = 'http://localhost:8000/api/v1';
 
-    protected function setUp(): void
+    public function test_can_get_all_products()
     {
-        parent::setUp();
-        $this->controller = new ProductController();
-    }
-
-    public function test_index_returns_all_products()
-    {
-        // Arrange
         $product = Product::factory()->create();
 
-        // Act
-        $response = $this->controller->index();
+        $response = $this->getJson("{$this->baseUrl}/products");
 
-        // Assert
-        $this->assertEquals(200, $response->status());
-        $this->assertEquals('success', $response->getData()->status);
-        $this->assertNotEmpty($response->getData()->data);
+        $response->assertStatus(200)
+                ->assertJsonStructure([
+                    'status',
+                    'message',
+                    'data' => [
+                        '*' => [
+                            'id',
+                            'name',
+                            'price',
+                            'calculate_length',
+                            'size'
+                        ]
+                    ]
+                ]);
     }
 
-    public function test_show_returns_specific_product()
+    public function test_can_create_product()
     {
-        // Arrange
-        $product = Product::factory()->create();
-
-        // Act
-        $response = $this->controller->show($product->id);
-
-        // Assert
-        $this->assertEquals(200, $response->status());
-        $this->assertEquals($product->id, $response->getData()->data->id);
-    }
-
-    public function test_store_creates_new_product()
-    {
-        // Arrange
         $supplier = Supplier::factory()->create();
         $inventory = Inventory::factory()->create();
         $admin = Admin::factory()->create();
 
-        $request = new Request([
-            'name' => 'Test Product',
+        $productData = [
+            'name' => $this->faker->word,
             'supplier_id' => $supplier->id,
             'seller_price' => 100,
             'discount' => 0,
+            'selling_discount' => 0,
             'price' => 150,
-            'brand_name' => 'Test Brand',
+            'brand_name' => $this->faker->word,
             'tax' => 10,
-            'size' => 'M',
-            'color' => 'Red',
-            'description' => 'Test Description',
-            'bar_code' => '123456789',
+            'size' => '10m',
+            'color' => 'red',
+            'description' => $this->faker->sentence,
+            'bar_code' => $this->faker->unique()->ean13,
             'inventory_id' => $inventory->id,
-            'admin_id' => $admin->id
-        ]);
+            'admin_id' => $admin->id,
+            'calculate_length' => true
+        ];
 
-        // Act
-        $response = $this->controller->store($request);
+        $response = $this->postJson("{$this->baseUrl}/products", $productData);
 
-        // Assert
-        $this->assertEquals(201, $response->status());
-        $this->assertEquals('success', $response->getData()->status);
-        $this->assertEquals('Test Product', $response->getData()->data->name);
+        $response->assertStatus(201)
+                ->assertJsonStructure([
+                    'status',
+                    'message',
+                    'data' => [
+                        'id',
+                        'name',
+                        'price'
+                    ]
+                ]);
     }
 
-    public function test_update_modifies_existing_product()
+    public function test_can_update_product()
     {
-        // Arrange
         $product = Product::factory()->create();
-        $request = new Request([
+
+        $updateData = [
             'name' => 'Updated Product',
             'price' => 200
-        ]);
+        ];
 
-        // Act
-        $response = $this->controller->update($request, $product->id);
+        $response = $this->putJson("{$this->baseUrl}/products/{$product->id}", $updateData);
 
-        // Assert
-        $this->assertEquals(200, $response->status());
-        $this->assertEquals('Updated Product', $response->getData()->data->name);
+        $response->assertStatus(200)
+                ->assertJsonPath('data.name', 'Updated Product')
+                ->assertJsonPath('data.price', 200);
     }
 
-    public function test_destroy_deletes_product()
+    public function test_can_delete_product()
     {
-        // Arrange
         $product = Product::factory()->create();
 
-        // Act
-        $response = $this->controller->destroy($product->id);
+        $response = $this->deleteJson("{$this->baseUrl}/products/{$product->id}");
 
-        // Assert
-        $this->assertEquals(200, $response->status());
+        $response->assertStatus(200)
+                ->assertJsonStructure([
+                    'status',
+                    'message'
+                ]);
+
         $this->assertDatabaseMissing('products', ['id' => $product->id]);
     }
 
-    public function test_get_by_inventory_id_returns_product()
+    public function test_can_update_stock()
     {
-        // Arrange
+        $inventory = Inventory::factory()->create(['quantity' => 100]);
+        $product = Product::factory()->create(['inventory_id' => $inventory->id]);
+
+        $response = $this->postJson("{$this->baseUrl}/products/update-stock", [
+            'product_id' => $product->id,
+            'quantity' => 10
+        ]);
+
+        $response->assertStatus(200);
+        $this->assertDatabaseHas('inventories', [
+            'id' => $inventory->id,
+            'quantity' => 90
+        ]);
+    }
+
+    public function test_can_get_product_by_inventory_id()
+    {
         $inventory = Inventory::factory()->create();
         $product = Product::factory()->create(['inventory_id' => $inventory->id]);
 
-        // Act
-        $response = $this->controller->getByInventoryId($inventory->id);
+        $response = $this->getJson("{$this->baseUrl}/products/inventory/{$inventory->id}");
 
-        // Assert
-        $this->assertEquals(200, $response->status());
-        $this->assertEquals($product->id, $response->getData()->id);
+        $response->assertStatus(200)
+                ->assertJsonStructure([
+                    'id',
+                    'name',
+                    'supplierDetails' => [
+                        'name',
+                        'email',
+                        'contact'
+                    ]
+                ]);
+    }
+
+    public function test_can_calculate_product_quantity_with_size()
+    {
+        $inventory = Inventory::factory()->create(['quantity' => 100]);
+        $product = Product::factory()->create([
+            'inventory_id' => $inventory->id,
+            'size' => '10.5',
+            'calculate_length' => true
+        ]);
+
+        $response = $this->getJson("{$this->baseUrl}/products/{$product->id}");
+
+        $response->assertStatus(200)
+                ->assertJson([
+                    'data' => [
+                        'quantity' => 1050.0  // 10.5 * 100
+                    ]
+                ]);
+
+        // Test with calculate_length = false
+        $product->update(['calculate_length' => false]);
+        $response = $this->getJson("{$this->baseUrl}/products/{$product->id}");
+
+        $response->assertStatus(200)
+                ->assertJson([
+                    'data' => [
+                        'quantity' => 100.0  // Raw quantity without multiplication
+                    ]
+                ]);
     }
 }

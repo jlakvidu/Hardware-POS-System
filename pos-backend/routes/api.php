@@ -191,3 +191,10 @@ Route::prefix('api')->group(function () {
     Route::put('/daily-expenses/{id}', [DailyExpensesController::class, 'update']);
     Route::delete('/daily-expenses/{id}', [DailyExpensesController::class, 'destroy']);
 });
+
+Route::get('/', function () {
+    return response()->json([
+        'status' => 'success',
+        'message' => 'API is working'
+    ]);
+});

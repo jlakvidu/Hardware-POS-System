@@ -4,7 +4,7 @@ namespace Tests\Unit;
 
 use Tests\TestCase;
 use App\Models\GRNNote;
-use App\Models\Inventory;
+use App\Models\Product;
 use App\Models\Supplier;
 use App\Models\Admin;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -22,7 +22,7 @@ class GRNNoteFactoryTest extends TestCase
         parent::setUp();
         
         // Create required related models
-        $this->product = Inventory::factory()->create();
+        $this->product = Product::factory()->create();
         $this->supplier = Supplier::factory()->create();
         $this->admin = Admin::factory()->create();
     }
