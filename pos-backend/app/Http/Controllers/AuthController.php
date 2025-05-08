@@ -135,7 +135,6 @@ class AuthController extends Controller
             return response()->json(['error' => 'Invalid OTP'], 400);
         }
 
-        // Check if OTP is expired (optional, 10 minutes expiry)
         if (now()->diffInMinutes($record->created_at) > 10) {
             return response()->json(['error' => 'OTP has expired'], 400);
         }

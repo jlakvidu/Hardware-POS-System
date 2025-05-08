@@ -26,7 +26,6 @@ class FeedbackController extends Controller
 
     public function store(Request $request)
     {
-        // Validate the incoming request
         try {
             $request->validate([
                 'customer_id' => 'required',
@@ -34,14 +33,12 @@ class FeedbackController extends Controller
                 'comment' => 'required|string|max:255',
             ]);
         } catch (ValidationException $th) {
-            // Return a custom response
             return response()->json([
                 'message' => 'Validation failed',
                 'errors' => $th->validator->errors(),
             ], 422);
         }
 
-        // Store the feedback record
         $feedback = Feedback::create($request->all());
 
         return response()->json([

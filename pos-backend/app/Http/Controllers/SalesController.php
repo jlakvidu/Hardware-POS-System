@@ -18,7 +18,6 @@ class SalesController extends Controller
 {
     public function index()
     {
-        // Fetch all sales records with product details and customer
         $sales = Sales::with(['product_sales.product', 'customer'])->get();
         return response()->json([
             'status' => 'success',
@@ -28,7 +27,6 @@ class SalesController extends Controller
 
     public function show($id)
     {
-        // Fetch a specific sales record by ID with product details
         $sales = Sales::with(['product_sales.product'])->find($id);
         if (!$sales) {
             return response()->json([
@@ -58,7 +56,6 @@ class SalesController extends Controller
             $total = 0;
             $productDiscountsTotal = 0;
 
-            // Calculate subtotal and product discounts
             foreach ($request->get('items') as $item) {
                 $itemSubtotal = $item['price'] * $item['quantity'];
                 $itemDiscountAmount = ($itemSubtotal * ($item['product_discount'] ?? 0)) / 100;
@@ -66,7 +63,6 @@ class SalesController extends Controller
                 $total += $itemSubtotal - $itemDiscountAmount;
             }
 
-            // Calculate cart discount
             $cartDiscountAmount = ($total * $request->get('discount')) / 100;
             $finalTotal = $total - $cartDiscountAmount;
 
@@ -113,7 +109,6 @@ class SalesController extends Controller
                         'price' => $item['price'],
                     ]);
 
-                    // Update inventory quantity with decimal handling
                     $inventory->quantity = round($inventory->quantity - $item['quantity'], 2);
                     $inventory->save();
 
@@ -124,7 +119,7 @@ class SalesController extends Controller
 
                 return response()->json([
                     'message' => 'Sales record created successfully',
-                    'data' => $sales, // Include the sales record with the ID
+                    'data' => $sales, 
                 ], 201);
 
             } catch (\Throwable $th) {
@@ -144,7 +139,6 @@ class SalesController extends Controller
 
     public function update(Request $request, $id)
     {
-        // Update an existing sales record
         $sales = Sales::find($id);
         if (!$sales) {
             return response()->json([
@@ -192,7 +186,6 @@ class SalesController extends Controller
             DB::commit();
         } catch (\Throwable $th) {
             DB::rollBack();
-            // Return a generic error message
             return response()->json([
                 'error' => 'An error occurred while updating the sales record',
                 'details' => $th->getMessage()
@@ -207,7 +200,6 @@ class SalesController extends Controller
 
     public function return(Request $request, $id)
     {
-        // Return items to inventory
         $sales = Sales::find($id);
         if (!$sales) {
             return response()->json([
@@ -238,11 +230,9 @@ class SalesController extends Controller
 
         DB::beginTransaction();
         try {
-            // First, get all products being returned
             $productIds = collect($request->get('items'))->pluck('product_id');
             $products = Product::with('inventory')->whereIn('id', $productIds)->get()->keyBy('id');
 
-            // Prepare return items and update inventory
             foreach ($request->get('items') as $item) {
                 $product = $products->get($item['product_id']);
 
@@ -250,7 +240,6 @@ class SalesController extends Controller
                     throw new \Exception("Product or inventory not found for ID: {$item['product_id']}");
                 }
 
-                // Create return item record
                 $returnItems[] = [
                     'reason' => $item['reason'],
                     'quantity' => $item['quantity'],
@@ -259,22 +248,17 @@ class SalesController extends Controller
                     'updated_at' => $date
                 ];
 
-                // Update inventory quantity
                 $product->inventory->increment('quantity', $item['quantity']);
 
-                // Update inventory status
                 $this->updateInventoryStatus($product->inventory);
             }
 
-            // Insert ReturnItems in bulk
             ReturnItem::insert($returnItems);
 
-            // Get the inserted return items
             $insertedReturnItems = ReturnItem::latest('created_at')
                 ->take(count($returnItems))
                 ->get();
 
-            // Create SalesReturnItems records
             foreach ($insertedReturnItems as $insertedItem) {
                 $salesReturnItems[] = [
                     'sales_id' => $sales['id'],
@@ -285,7 +269,6 @@ class SalesController extends Controller
                 ];
             }
 
-            // Insert SalesReturnItems in bulk
             SalesReturnItem::insert($salesReturnItems);
 
             DB::commit();
@@ -315,24 +298,19 @@ class SalesController extends Controller
 
     private function updateSales(Request $request, $sales, $salesRecord)
     {
-        // Update the sales record
         $sales->update($salesRecord);
 
-        // Get all existing products in the sales record
         $product_sales = Product_sales::where('sales_id', $sales['id'])->get()->keyBy('product_id');
 
-        // Prepare arrays for bulk update
         $updateData = [];
         $newItems = [];
         $deleteIds = [];
         $inventoryUpdates = [];
         $currentTimeStamp = now();
 
-        // Collect all product IDs from the new request
         $productIds = collect($request->get('items'))->pluck('product_id')->unique();
         $products = Product::whereIn('id', $productIds)->get()->keyBy('id');
 
-        // Loop through the items in the request
         foreach ($request->get('items') as $newItem) {
             $product = $products->get($newItem['product_id']);
 
@@ -345,19 +323,15 @@ class SalesController extends Controller
                 throw new \Exception("Inventory for Product with ID {$newItem['product_id']} not found.");
             }
 
-            // If item exists in current sales
             if (isset($product_sales[$newItem['product_id']])) {
                 $existingItem = $product_sales[$newItem['product_id']];
                 $quantityDiff = $newItem['quantity'] - $existingItem->quantity;
 
-                // Only update inventory if quantity has changed
                 if ($quantityDiff !== 0) {
-                    // Check if we have enough stock for an increase
                     if ($quantityDiff > 0 && $inventory->quantity < $quantityDiff) {
                         throw new \Exception("Not enough stock for Product ID {$newItem['product_id']}");
                     }
 
-                    // Calculate new inventory quantity
                     $newQuantity = $inventory->quantity - $quantityDiff;
                     $inventoryUpdates[] = [
                         'inventory_id' => $inventory->id,
@@ -365,7 +339,6 @@ class SalesController extends Controller
                     ];
                 }
 
-                // Update sales item data
                 $updateData[] = [
                     'product_id' => $newItem['product_id'],
                     'sales_id' => $sales['id'],
@@ -375,7 +348,6 @@ class SalesController extends Controller
 
                 unset($product_sales[$newItem['product_id']]);
             } else {
-                // For new items
                 if ($inventory->quantity < $newItem['quantity']) {
                     throw new \Exception("Not enough stock for Product ID {$newItem['product_id']}");
                 }
@@ -389,7 +361,6 @@ class SalesController extends Controller
                     'updated_at' => $currentTimeStamp
                 ];
 
-                // Update inventory for new items
                 $inventoryUpdates[] = [
                     'inventory_id' => $inventory->id,
                     'new_quantity' => $inventory->quantity - $newItem['quantity']
@@ -397,14 +368,12 @@ class SalesController extends Controller
             }
         }
 
-        // Handle deletions
         $deleteIds = $product_sales->keys()->toArray();
         if (!empty($deleteIds)) {
             Product_sales::whereIn('product_id', $deleteIds)
                 ->where('sales_id', $sales['id'])
                 ->delete();
 
-            // Return stock for deleted items
             foreach ($product_sales as $deletedItem) {
                 $product = Product::find($deletedItem->product_id);
                 if ($product && $product->inventory) {
@@ -416,7 +385,6 @@ class SalesController extends Controller
             }
         }
 
-        // Apply updates
         foreach ($updateData as $data) {
             Product_sales::where('product_id', $data['product_id'])
                 ->where('sales_id', $data['sales_id'])
@@ -430,7 +398,6 @@ class SalesController extends Controller
             Product_sales::insert($newItems);
         }
 
-        // Update inventory quantities and status
         foreach ($inventoryUpdates as $update) {
             $inventory = Inventory::find($update['inventory_id']);
             if ($inventory) {
@@ -484,7 +451,6 @@ class SalesController extends Controller
             ], 400);
         }
 
-        // Ensure the dates are in the correct format
     try {
         $startDate = new \DateTime($startDate);
         $endDate = new \DateTime($endDate);
@@ -494,7 +460,6 @@ class SalesController extends Controller
         ], 400);
     }
 
-    // Convert the dates to the correct format for the query
     $startDateFormatted = $startDate->format('Y-m-d 00:00:00');
     $endDateFormatted = $endDate->format('Y-m-d 23:59:59');
 

@@ -16,7 +16,6 @@ class AdminController extends Controller
             return response()->json(['message' => 'User not found'], 404);
         }
 
-        // Check if the user is already an admin
         if ($user->admin) {
             return response()->json(['message' => 'User is already an admin'], 400);
         }

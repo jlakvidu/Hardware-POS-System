@@ -15,12 +15,11 @@ class CustomerController extends Controller
 {
     public function index()
     {
-        // Fetch all customers
         $customers = Customer::with('customerContact')->paginate(10);
         log($customers);
 
         return response()->json([
-            'data' => $customers->items(), // The paginated items
+            'data' => $customers->items(), 
             'current_page' => $customers->currentPage(),
             'per_page' => $customers->perPage(),
             'total' => $customers->total(),
@@ -32,7 +31,6 @@ class CustomerController extends Controller
 
     public function store(Request $request)
     {
-        // Validate the incoming request
         try {
             $validatedAttributes = $request->validate([
                 'name' => 'required|string|max:255',
@@ -40,14 +38,12 @@ class CustomerController extends Controller
                 'contact_number' => 'required|string|max:20',
             ]);
         } catch (ValidationException $th) {
-            // Return a custom response
             return response()->json([
                 'message' => 'Validation failed',
                 'errors' => $th->errors()
             ], 422);
         }
 
-        // Create a new customer record
         DB::beginTransaction();
         try {
             log($validatedAttributes);
@@ -56,7 +52,6 @@ class CustomerController extends Controller
             DB::commit();
         } catch (\Throwable $th) {
             DB::rollBack();
-            // Return a generic error message
             return response()->json([
                 'message' => 'An error occurred while saving the customer.',
                 'errors' => $th->getMessage()
@@ -71,7 +66,6 @@ class CustomerController extends Controller
 
     public function show($id)
     {
-        // search customer
         $existingCustomer = Customer::with('customerContact')->find($id);
         if (!$existingCustomer) {
             return response()->json([
@@ -91,7 +85,6 @@ class CustomerController extends Controller
             ], 404);
         }
 
-        // Validate the incoming request
         try {
             $validatedAttributes = $request->validate([
                 'name' => 'required|string|max:255',
@@ -99,14 +92,12 @@ class CustomerController extends Controller
                 'contact_number' => 'required|string|max:20',
             ]);
         } catch (ValidationException $th) {
-            // Return a custom response
             return response()->json([
                 'message' => 'Validation failed',
                 'errors' => $th->errors()
             ], 422);
         }
 
-        // Update the customer record
         DB::beginTransaction();
         try {
             $existingCustomer->update(['name' => $validatedAttributes['name'], 'email' => $validatedAttributes['email']]);
@@ -114,7 +105,6 @@ class CustomerController extends Controller
             DB::commit();
         } catch (\Throwable $th) {
             DB::rollBack();
-            // Return a generic error message
             return response()->json([
                 'message' => 'An error occurred while updating the customer.',
                 'errors' => $th->getMessage()
@@ -136,7 +126,6 @@ class CustomerController extends Controller
             ], 404);
         }
 
-        // Delete the customer record
         DB::beginTransaction();
         try {
             $existingCustomer->delete();
@@ -144,7 +133,6 @@ class CustomerController extends Controller
             DB::commit();
         } catch (\Throwable $th) {
             DB::rollBack();
-            // Return a generic error message
             return response()->json([
                 'message' => 'An error occurred while deleting the customer.',
                 'errors' => $th->getMessage()

@@ -46,7 +46,7 @@ class InventoryController extends Controller
             $inventory->restock_date_time = now();
             $inventory->added_stock_amount = $request->input('added_stock_amount', $inventory->quantity);
             $inventory->location = $request->input('location');
-            $inventory->status = $request->input('status'); // Use the exact status from frontend
+            $inventory->status = $request->input('status');
             $inventory->save();
             $this->updateStatus();
             return response()->json($inventory);
@@ -85,7 +85,6 @@ class InventoryController extends Controller
             $inventory->location = $validated['location'];
             $inventory->status = $validated['status'];
 
-            // Update restock info only if new stock is added
             if (!empty($validated['added_stock_amount']) && $validated['added_stock_amount'] > 0) {
                 $inventory->restock_date_time = $validated['restock_date_time'];
                 $inventory->added_stock_amount = $validated['added_stock_amount'];
@@ -239,14 +238,11 @@ class InventoryController extends Controller
             $formattedData = $inventories->map(function ($inventory) use (&$totalValue, &$totalProfit) {
                 $status = $this->determineStatus($inventory->quantity);
 
-                // Ensure product relationship is loaded
                 $product = $inventory->product;
 
                 if ($product) {
-                    // Calculate total value using seller price (bought price)
                     $itemValue = ($product->seller_price ?? 0) * $inventory->quantity;
 
-                    // Calculate total profit using (price - seller price) * quantity
                     $itemProfit = (($product->price ?? 0) - ($product->seller_price ?? 0)) * $inventory->quantity;
 
                     $totalValue += $itemValue;
@@ -286,7 +282,6 @@ class InventoryController extends Controller
                 ];
             });
 
-            // Debugging logs
             \Log::info('Export Data Summary', [
                 'total_value' => $totalValue,
                 'total_profit' => $totalProfit

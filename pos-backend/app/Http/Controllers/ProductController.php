@@ -18,8 +18,8 @@ class ProductController extends Controller
     {
         try {
             $products = Product::with('inventory', 'admin')->get()->map(function ($product) {
-                $product->calculate_length = $product->calculate_length; // Include calculate_length
-                $product->size = $product->size; // Include size
+                $product->calculate_length = $product->calculate_length; 
+                $product->size = $product->size;
                 return $product;
             });
             return $this->successResponse('Product retrieved successfully', $products);
@@ -33,7 +33,7 @@ class ProductController extends Controller
             $product = Product::with('inventory')->findOrFail($id);
             $product->quantity = $product->calculate_length && $product->inventory
                 ? $product->size * $product->inventory->quantity
-                : $product->inventory->quantity; // Send either multiplied or raw quantity
+                : $product->inventory->quantity; 
             return $this->successResponse('Product retrieved successfully', $product);
         } catch (Exception $e) {
             return $this->errorResponse('Product not found', 404);
@@ -41,7 +41,6 @@ class ProductController extends Controller
     }
     public function store(Request $request): JsonResponse
     {
-        // Debugging: Log the incoming request data
         Log::info('Incoming Request:', $request->all());
 
         try {
@@ -49,8 +48,8 @@ class ProductController extends Controller
                 'name' => 'required|string|max:255',
                 'supplier_id' => 'required|exists:suppliers,id',
                 'seller_price' => 'required|numeric|min:0',
-                'discount' => 'required|numeric|min:0', // Normal discount
-                'selling_discount' => 'sometimes|numeric|min:0', // Ensure this validation rule is correct
+                'discount' => 'required|numeric|min:0', 
+                'selling_discount' => 'sometimes|numeric|min:0', 
                 'price' => 'required|numeric|min:0',
                 'brand_name' => 'required|string|max:255',
                 'tax' => 'required|numeric|min:0',
@@ -60,20 +59,18 @@ class ProductController extends Controller
                 'bar_code' => 'unique:products',
                 'inventory_id' => 'required|exists:inventories,id',
                 'admin_id' => 'required|exists:admins,id',
-                'calculate_length' => 'sometimes|boolean', // Ensure calculate_length is validated
+                'calculate_length' => 'sometimes|boolean', 
             ]);
 
             if ($validator->fails()) {
                 return $this->errorResponse($validator->errors(), 422);
             }
 
-            // Check if inventory exists
             $inventory = Inventory::find($request->inventory_id);
             if (!$inventory) {
                 return $this->errorResponse('Invalid inventory ID. Please enter a valid inventory ID.', 404);
             }
 
-            // Check for duplicate bar code
             if (Product::where('bar_code', $request->bar_code)->exists()) {
                 return response()->json([
                     'status' => 'error',
@@ -83,17 +80,15 @@ class ProductController extends Controller
 
             DB::beginTransaction();
 
-            // Calculate profit
             $profit = $request->price - $request->seller_price;
 
-            // Create product with existing inventory ID
             $product = Product::create([
                 'name' => $request->name,
                 'price' => $request->price,
                 'seller_price' => $request->seller_price,
                 'profit' => $profit,
-                'discount' => $request->discount ?? 0, // Normal discount
-                'selling_discount' => $request->selling_discount ?? 0, // Save selling discount
+                'discount' => $request->discount ?? 0, 
+                'selling_discount' => $request->selling_discount ?? 0, 
                 'tax' => $request->tax,
                 'size' => $request->size,
                 'color' => $request->color,
@@ -103,10 +98,9 @@ class ProductController extends Controller
                 'inventory_id' => $request->inventory_id,
                 'supplier_id' => $request->supplier_id,
                 'admin_id' => $request->admin_id,
-                'calculate_length' => $request->calculate_length ?? false, // Store calculate_length
+                'calculate_length' => $request->calculate_length ?? false, 
             ]);
 
-            // Create supplier product relationship
             SupplierProduct::create([
                 'product_id' => $product->id,
                 'supplier_id' => $request->supplier_id
@@ -114,7 +108,6 @@ class ProductController extends Controller
 
             DB::commit();
 
-            // Load the inventory relationship
             $product->load('inventory');
 
             return $this->successResponse('Product created successfully', $product, 201);
@@ -138,8 +131,8 @@ class ProductController extends Controller
                 'supplier' => 'sometimes|string|max:255',
                 'price' => 'sometimes|numeric|min:0',
                 'seller_price' => 'sometimes|numeric|min:0',
-                'discount' => 'sometimes|numeric|min:0', // Normal discount
-                'selling_discount' => 'sometimes|numeric|min:0', // Validate selling_discount
+                'discount' => 'sometimes|numeric|min:0',
+                'selling_discount' => 'sometimes|numeric|min:0',
                 'brand_name' => 'sometimes|string|max:255',
                 'tax' => 'sometimes|numeric|min:0',
                 'size' => 'sometimes|string',
@@ -149,7 +142,7 @@ class ProductController extends Controller
                 'status' => 'sometimes|in:In Stock,Out Of Stock',
                 'inventory_id' => 'sometimes|exists:inventories,id',
                 'admin_id' => 'sometimes|exists:admins,id',
-                'calculate_length' => 'sometimes|boolean', // Ensure calculate_length is validated
+                'calculate_length' => 'sometimes|boolean', 
             ]);
 
             if ($validator->fails()) {
@@ -159,8 +152,8 @@ class ProductController extends Controller
             $profit = $request->price - $request->seller_price;
             $product->update($validator->validated() + [
                 'profit' => $profit,
-                'discount' => $request->discount ?? $product->discount, // Normal discount
-                'selling_discount' => $request->selling_discount ?? $product->selling_discount, // Update selling discount
+                'discount' => $request->discount ?? $product->discount, 
+                'selling_discount' => $request->selling_discount ?? $product->selling_discount, 
             ]);
 
             return $this->successResponse('Product updated successfully', $product);
@@ -187,12 +180,11 @@ class ProductController extends Controller
     {
         try {
             $product = Product::with(['supplier' => function($query) {
-                $query->select('id', 'name', 'email', 'contact'); // Add any other supplier fields you need
+                $query->select('id', 'name', 'email', 'contact'); 
             }])
             ->where('inventory_id', $inventoryId)
             ->firstOrFail();
 
-            // Format the product data with supplier details
             $formattedProduct = array_merge($product->toArray(), [
                 'supplierDetails' => $product->supplier ? [
                     'name' => $product->supplier->name,
@@ -220,7 +212,7 @@ class ProductController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'product_id' => 'required|exists:products,id',
-                'quantity' => 'required|numeric|min:0.1', // Allow decimal quantities
+                'quantity' => 'required|numeric|min:0.1', 
             ]);
 
             if ($validator->fails()) {
@@ -235,14 +227,11 @@ class ProductController extends Controller
                     throw new Exception('Insufficient stock');
                 }
 
-                // Lock the inventory row to prevent concurrent updates
                 $inventory->lockForUpdate();
 
-                // Log the stock update for debugging
                 Log::info("Updating stock for product ID {$request->product_id}. Deducting quantity: {$request->quantity}");
 
-                // Deduct the exact quantity from the inventory
-                $inventory->quantity = round($inventory->quantity - $request->quantity, 2); // Ensure precision
+                $inventory->quantity = round($inventory->quantity - $request->quantity, 2); 
                 $inventory->save();
             });
 

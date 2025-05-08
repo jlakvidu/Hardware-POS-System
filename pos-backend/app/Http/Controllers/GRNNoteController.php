@@ -21,7 +21,6 @@ class GRNNoteController extends Controller
     {
         DB::beginTransaction();
         try {
-            // Validate request
             $validatedData = $request->validate([
                 'grn_number' => 'required|string|unique:grn_notes',
                 'product_id' => 'required|exists:products,id',
@@ -38,7 +37,6 @@ class GRNNoteController extends Controller
                 'received_date' => 'required|date'
             ]);
 
-            // Create GRN Note
             $grnNote = GRNNote::create($validatedData);
 
             DB::commit();

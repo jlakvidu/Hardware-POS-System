@@ -94,7 +94,7 @@ class PromotionController extends Controller
                                  ->get();
             
             if ($promotions->isEmpty()) {
-                return response()->json([], 200); // Return empty array with 200 status
+                return response()->json([], 200); 
             }
             
             return response()->json($promotions, 200);

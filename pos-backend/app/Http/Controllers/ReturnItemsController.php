@@ -10,7 +10,6 @@ class ReturnItemsController extends Controller
 {
     public function index()
     {
-        // Fetch all return items with related sales return data
         $returnItems = ReturnItem::with(['salesReturnItem'])
             ->orderBy('created_at', 'desc')
             ->get()
@@ -35,7 +34,6 @@ class ReturnItemsController extends Controller
 
     public function show($id)
     {
-        // Fetch a specific return item by ID
         $returnItem = ReturnItem::find($id);
         if (!$returnItem) {
             return response()->json([

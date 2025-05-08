@@ -68,9 +68,7 @@ class ProductImagesController extends Controller
             ]);
             $updateData = $request->except(['product_id', 'images']);
             if ($request->hasFile('images')) {
-                // Delete old image
                 Storage::disk('public')->delete($image->path);
-                // Store new image
                 $file = $request->file('images');
                 $imagePath = $file->store('products', 'public');
                 $updateData['path'] = $imagePath;
@@ -102,7 +100,6 @@ class ProductImagesController extends Controller
     {
         try {
             $image = ProductImages::findOrFail($id);
-            // Delete the image file
             Storage::disk('public')->delete($image->path);
             $image->delete();
             return $this->successResponse('Image deleted successfully');
@@ -114,7 +111,6 @@ class ProductImagesController extends Controller
         }
     }
 
-    // Response methods
     private function successResponse($message, $data = null, $code = 200)
     {
         return response()->json([

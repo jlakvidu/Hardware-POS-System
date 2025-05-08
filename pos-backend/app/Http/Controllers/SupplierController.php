@@ -26,7 +26,6 @@ class SupplierController extends Controller
         ]);
 
         try {
-            // Get the first admin id from the admins table
             $adminId = DB::table('admins')->first()->id;
             if (!$adminId) {
                 throw new \Exception('No admin found in the system');

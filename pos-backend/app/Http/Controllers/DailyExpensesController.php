@@ -30,14 +30,13 @@ class DailyExpensesController extends Controller
                 'custom_category' => 'required_if:category,other|string|max:255|nullable',
                 'description' => 'nullable|string',
                 'amount' => 'required|numeric|min:0',
-                'date' => 'nullable|date', // Will default to today if not provided
+                'date' => 'nullable|date', 
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json(['message' => $e->validator->errors()], 400);
         }
 
         $data = $request->all();
-        // Set date to today if not provided
         $data['date'] = $request->input('date', now()->toDateString());
 
         $expense = DailyExpenses::create($data);
