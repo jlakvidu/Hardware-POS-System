@@ -46,13 +46,14 @@ const router = useRouter()
 const navigateToCustomers = () => {
   const isAdmin = localStorage.getItem('isAdmin') === 'true';
   Swal.fire({
-    title: 'Navigate to Customers?',
-    text: "Do you want to go to the customers page?",
+    title: 'Add New Customer?',
+    text: "Would you like to register a new customer?",
     icon: 'question',
     showCancelButton: true,
     confirmButtonColor: '#3B82F6',
     cancelButtonColor: '#6B7280',
-    confirmButtonText: 'Yes, navigate',
+    confirmButtonText: 'Yes, add customer',
+    cancelButtonText: 'Cancel',
     background: '#1e293b',
     color: '#ffffff'
   }).then((result) => {
@@ -69,8 +70,7 @@ const navigateToCustomers = () => {
 const isSidebarVisible = ref(false)
 const isPaymentModalOpen = ref(false)
 const isReceiptVisible = ref(false)
-const selectedPaymentMethod = ref('CASH')
-const customerName = ref('Walk-in Customer')
+const selectedPaymentMethod = ref('CASH') // Change default payment method
 const orderItems = ref([])
 const searchQuery = ref('')
 const transactionId = ref('')
@@ -192,8 +192,13 @@ const addToOrder = (product) => {
         price: product.price,
         quantity: 1,
         initialStock: product.stock,
-        productDiscount: 0 // Add default product discount
+        productDiscount: 0,
+        width: 0,
+        height: 0,
+        totalArea: 0,
+        dimensions: ''
       })
+      showToast(`Added ${product.name} to order`)
     } else {
       Swal.fire({
         title: 'Out of Stock',
@@ -205,8 +210,77 @@ const addToOrder = (product) => {
       return
     }
   }
+}
 
-  showToast(`Added ${product.name} to order`)
+const updateDimensions = (item) => {
+  if (item.width && item.height) {
+    item.totalArea = item.width * item.height
+    item.totalAreaMeters = (item.width * item.height * 0.00064516).toFixed(2)
+    item.dimensions = `${item.width}" × ${item.height}" | ${item.totalAreaMeters} m²`
+  }
+}
+
+const openDimensionsModal = (item) => {
+  Swal.fire({
+    title: 'Enter Banner Dimensions',
+    html: `
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Width (inches)</label>
+          <input id="width" type="number" min="1" step="0.1" value="${item.width || ''}" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white" />
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Height (inches)</label>
+          <input id="height" type="number" min="1" step="0.1" value="${item.height || ''}" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white" />
+        </div>
+        <div class="mt-4 p-3 bg-gray-800 rounded-lg">
+          <div class="text-sm text-gray-400">Preview:</div>
+          <div class="text-white mt-1" id="preview">Enter dimensions to see preview</div>
+        </div>
+      </div>
+    `,
+    showCancelButton: true,
+    confirmButtonText: 'Update Dimensions',
+    background: '#1e293b',
+    color: '#ffffff',
+    didOpen: () => {
+      const width = document.getElementById('width');
+      const height = document.getElementById('height');
+      const preview = document.getElementById('preview');
+      
+      const updatePreview = () => {
+        const w = parseFloat(width.value);
+        const h = parseFloat(height.value);
+        if (w && h) {
+          const sqMeters = (w * h * 0.00064516).toFixed(2);
+          preview.innerHTML = `
+            <div class="flex flex-col gap-1">
+              <div class="text-blue-400">${w}" × ${h}"</div>
+              <div class="text-green-400">${sqMeters} m²</div>
+            </div>
+          `;
+        }
+      };
+      
+      width.addEventListener('input', updatePreview);
+      height.addEventListener('input', updatePreview);
+    },
+    preConfirm: () => {
+      const width = document.getElementById('width').value
+      const height = document.getElementById('height').value
+      if (!width || !height) {
+        Swal.showValidationMessage('Please enter both width and height')
+      }
+      return { width: parseFloat(width), height: parseFloat(height) }
+    }
+  }).then((result) => {
+    if (result.isConfirmed) {
+      const { width, height } = result.value
+      item.width = width
+      item.height = height
+      updateDimensions(item)
+    }
+  })
 }
 
 const updateProductDiscount = (item, value) => {
@@ -327,7 +401,24 @@ const updateProductStock = (productId, quantity) => {
   }
 }
 
-const completeOrder = async () => {
+const isAdvancePayment = ref(false)
+const advanceAmount = ref(0)
+const remainingBalance = computed(() => total.value - advanceAmount.value)
+const paymentStatus = computed(() => {
+  if (!isAdvancePayment.value) return 'FULL_PAYMENT'
+  if (advanceAmount.value === 0) return 'PENDING'
+  if (advanceAmount.value === total.value) return 'PAID'
+  return 'PARTIALLY_PAID'
+})
+
+const formatCurrency = (amount) => {
+  return new Intl.NumberFormat('en-LK', {
+    style: 'currency',
+    currency: 'LKR'
+  }).format(amount)
+}
+
+const handleAdvancePayment = async () => {
   try {
     isProcessingOrder.value = true;
 
@@ -337,9 +428,82 @@ const completeOrder = async () => {
 
     const salesData = {
       time: new Date().toISOString(),
-      status: orderStatus.value,
+      status: 2, // 2 for partially paid
       payment_type: selectedPaymentMethod.value,
       amount: total.value,
+      advance_amount: advanceAmount.value,
+      remaining_balance: remainingBalance.value,
+      cashier_id: cashierId.value,
+      customer_id: selectedCustomer.value?.id,
+      discount: applyDiscount.value ? customDiscountRate.value : 0,
+      items: orderItems.value.map(item => ({
+        product_id: item.id,
+        quantity: item.quantity,
+        price: item.price,
+        product_discount: item.productDiscount
+      }))
+    };
+
+    const response = await connection.post('/sales', salesData);
+    
+    if (response.status === 201) {
+      orderId.value = response.data.data.id;
+      isPaymentModalOpen.value = false;
+
+      Swal.fire({
+        title: 'Advance Payment Recorded!',
+        text: 'Do you want to print a receipt?',
+        icon: 'success',
+        showCancelButton: true,
+        confirmButtonColor: '#3B82F6',
+        cancelButtonColor: '#6B7280',
+        confirmButtonText: 'Yes, print receipt',
+        cancelButtonText: 'No, thanks',
+        background: '#1e293b',
+        color: '#ffffff'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          isReceiptVisible.value = true;
+        } else {
+          clearOrder();
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Error processing advance payment:', error);
+    Swal.fire({
+      title: 'Error!',
+      text: 'Failed to process advance payment. Please try again.',
+      icon: 'error',
+      background: '#1e293b',
+      color: '#ffffff'
+    });
+  } finally {
+    isProcessingOrder.value = false;
+  }
+};
+
+const completeOrder = async () => {
+  if (isAdvancePayment.value) {
+    await handleAdvancePayment();
+    return;
+  }
+
+  try {
+    isProcessingOrder.value = true;
+
+    if (!cashierId.value) {
+      throw new Error('No cashier ID found. Please login again.');
+    }
+
+    const salesData = {
+      time: new Date().toISOString(),
+      status: isAdvancePayment.value ? 2 : 1, // 2 for partially paid, 1 for fully paid
+      payment_type: selectedPaymentMethod.value,
+      amount: total.value,
+      advance_amount: isAdvancePayment.value ? advanceAmount.value : total.value,
+      remaining_balance: isAdvancePayment.value ? remainingBalance.value : 0,
+      payment_status: paymentStatus.value,
       cashier_id: cashierId.value,
       customer_id: customerName.value === 'Walk-in Customer' ? null : 
         customers.value.find(c => c.name === customerName.value)?.id,
@@ -534,6 +698,51 @@ onMounted(async () => {
   const now = new Date()
   currentDate.value = `${now.toLocaleString('default', { month: 'long' })} ${now.getDate()}, ${now.getFullYear()}`
 })
+
+const isCustomerModalOpen = ref(false)
+const customerSearchQuery = ref('')
+const selectedCustomer = ref(null)
+const customerName = ref('Select Customer')
+
+const filteredCustomers = computed(() => {
+  const query = customerSearchQuery.value.toLowerCase()
+  return customers.value.filter(customer => 
+    customer.name.toLowerCase().includes(query) || 
+    customer.phone?.toLowerCase().includes(query) ||
+    customer.email?.toLowerCase().includes(query)
+  )
+})
+
+const selectCustomer = (customer) => {
+  selectedCustomer.value = customer
+  customerName.value = customer.name
+  isCustomerModalOpen.value = false
+}
+
+const clearSelectedCustomer = () => {
+  Swal.fire({
+    title: 'Clear Customer Selection?',
+    text: "Are you sure you want to remove the selected customer?",
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#3B82F6',
+    cancelButtonColor: '#6B7280',
+    confirmButtonText: 'Yes, clear',
+    cancelButtonText: 'Cancel',
+    background: '#1e293b',
+    color: '#ffffff'
+  }).then((result) => {
+    if (result.isConfirmed) {
+      selectedCustomer.value = null;
+      customerName.value = 'Select Customer';
+    }
+  });
+}
+
+const selectWalkInCustomer = () => {
+  clearSelectedCustomer()
+  isCustomerModalOpen.value = false
+}
 </script>
 
 <template>
@@ -690,22 +899,49 @@ onMounted(async () => {
                 <label class="block text-xs text-gray-400 mb-1.5 flex items-center justify-between">
                   <div class="flex items-center gap-1">
                     <User class="w-3 h-3" />
-                    <span>Customer</span>
+                    <span>Customer Information</span>
                   </div>
-                  <button @click.prevent="navigateToCustomers" 
-                          class="p-1 hover:bg-gray-700/50 rounded-full transition-colors group">
-                    <UserPlusIcon class="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform" />
-                  </button>
+                  <div class="flex items-center gap-2">
+                    <button @click="navigateToCustomers" 
+                            title="Add New Customer"
+                            class="p-1 hover:bg-gray-700/50 rounded-full transition-colors group">
+                      <UserPlusIcon class="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform" />
+                    </button>
+                    <button @click="isCustomerModalOpen = true"
+                            class="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded-full hover:bg-blue-500/30 transition-colors">
+                      Select Customer
+                    </button>
+                  </div>
                 </label>
-                <select v-model="customerName"
-                  class="w-full bg-gray-700/50 border border-gray-600/50 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-400/30 appearance-none">
-                  <option>Walk-in Customer</option>
-                  <option v-for="customer in customers" 
-                          :key="customer.id" 
-                          :value="customer.name">
-                    {{ customer.name }}
-                  </option>
-                </select>
+                <div class="bg-gray-700/50 border border-gray-600/50 rounded-lg px-3 py-2">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <div class="text-sm text-white font-medium flex items-center gap-2">
+                        {{ selectedCustomer ? selectedCustomer.name : 'No Customer Selected' }}
+                        <span v-if="!selectedCustomer" 
+                              class="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full">
+                          Please select a customer
+                        </span>
+                      </div>
+                      <div v-if="selectedCustomer" class="text-xs text-gray-400 mt-1 space-y-0.5">
+                        <div v-if="selectedCustomer.phone" class="flex items-center gap-1">
+                          <phone-icon class="w-3 h-3" />
+                          {{ selectedCustomer.phone }}
+                        </div>
+                        <div v-if="selectedCustomer.email" class="flex items-center gap-1">
+                          <mail-icon class="w-3 h-3" />
+                          {{ selectedCustomer.email }}
+                        </div>
+                      </div>
+                    </div>
+                    <button v-if="selectedCustomer"
+                            @click="clearSelectedCustomer"
+                            class="p-1.5 hover:bg-gray-600/50 rounded-full group"
+                            title="Clear Selection">
+                      <X class="w-4 h-4 text-gray-400 group-hover:text-red-400 transition-colors" />
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -756,6 +992,21 @@ onMounted(async () => {
                           <Plus class="w-3 h-3" />
                         </button>
                       </div>
+
+                      <!-- Add Dimensions Button -->
+                      <button @click.stop="openDimensionsModal(item)"
+                        class="p-1.5 text-blue-400 hover:bg-blue-400/10 rounded transition-colors">
+                        <div class="flex items-center gap-2">
+                          <Ruler class="w-3.5 h-3.5" />
+                          <div class="text-xs">
+                            <template v-if="item.dimensions">
+                              <div>{{ `${item.width}" × ${item.height}"` }}</div>
+                              <div class="text-green-400">{{ `${item.totalAreaMeters} m²` }}</div>
+                            </template>
+                            <span v-else>Set Size</span>
+                          </div>
+                        </div>
+                      </button>
 
                       <div class="text-gray-300 text-xs font-medium">
                         Rs. {{ getItemTotal(item).toLocaleString() }}
@@ -864,8 +1115,7 @@ onMounted(async () => {
     <div v-if="isPaymentModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" @click="isPaymentModalOpen = false"></div>
 
-      <div
-        class="relative bg-gray-800 rounded-lg shadow-xl border border-gray-700/50 w-full max-w-md p-6 z-10 animate-scale-in">
+      <div class="relative bg-gray-800 rounded-lg shadow-xl border border-gray-700/50 w-full max-w-md p-6 z-10 animate-scale-in">
         <div class="flex justify-between items-center mb-5">
           <h2 class="text-xl font-bold text-gray-200">Complete Payment</h2>
           <button @click="isPaymentModalOpen = false" class="p-1.5 hover:bg-gray-700/50 rounded-full transition-colors">
@@ -874,42 +1124,99 @@ onMounted(async () => {
         </div>
 
         <div class="mb-5">
-          <div class="text-sm text-gray-400 mb-1">Order Total</div>
-          <div class="text-2xl font-bold text-white">Rs. {{ total.toLocaleString() }}</div>
-        </div>
+          <div class="flex items-center justify-between mb-3">
+            <div class="text-sm text-gray-400">Order Total</div>
+            <div class="text-2xl font-bold text-white">{{ formatCurrency(total) }}</div>
+          </div>
 
-        <div class="mb-6">
-          <div class="text-sm text-gray-400 mb-3">Select Payment Method</div>
-          <div class="grid grid-cols-2 gap-3">
-            <button @click="selectedPaymentMethod = 'CASH'" :class="[
-              'flex flex-col items-center gap-2 p-3 rounded-lg transition-all duration-200',
-              selectedPaymentMethod === 'CASH'
-                ? 'bg-blue-500/20 border-2 border-blue-500/50'
-                : 'bg-gray-700/50 border border-gray-700/50 hover:bg-gray-700'
-            ]">
-              <Banknote class="w-6 h-6" :class="selectedPaymentMethod === 'CASH' ? 'text-blue-400' : 'text-white'" />
-              <span class="text-sm text-white">Cash</span>
-            </button>
+          <!-- Add Payment Method Selection -->
+          <div class="bg-gray-700/30 rounded-lg p-4 mb-4">
+            <label class="text-sm text-gray-400 mb-3 block">Payment Method</label>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <button 
+                v-for="method in ['CASH', 'CARD', 'CHECK', 'ONLINE']" 
+                :key="method"
+                @click="selectedPaymentMethod = method"
+                :class="[
+                  'p-3 rounded-lg border transition-all duration-200 flex flex-col items-center gap-2',
+                  selectedPaymentMethod === method 
+                    ? 'bg-blue-500/20 border-blue-500/50 text-white' 
+                    : 'bg-gray-700/50 border-gray-600/50 text-gray-400 hover:bg-gray-600/50'
+                ]"
+              >
+                <component :is="{
+                  'CASH': Banknote,
+                  'CARD': CreditCard,
+                  'CHECK': FileText,
+                  'ONLINE': FileText
+                }[method]" class="w-5 h-5" />
+                <span class="text-sm">{{ method }}</span>
+              </button>
+            </div>
+          </div>
 
-            <button @click="selectedPaymentMethod = 'CREDIT_CARD'" :class="[
-              'flex flex-col items-center gap-2 p-3 rounded-lg transition-all duration-200',
-              selectedPaymentMethod === 'CREDIT_CARD'
-                ? 'bg-blue-500/20 border-2 border-blue-500/50'
-                : 'bg-gray-700/50 border border-gray-700/50 hover:bg-gray-700'
-            ]">
-              <CreditCard class="w-6 h-6" :class="selectedPaymentMethod === 'CREDIT_CARD' ? 'text-blue-400' : 'text-white'" />
-              <span class="text-sm text-white">Credit Card</span>
-            </button>
+          <!-- Advanced Payment Toggle -->
+          <div class="bg-gray-700/30 rounded-lg p-4">
+            <label class="flex items-center justify-between">
+              <span class="text-sm text-gray-300">Enable Advance Payment</span>
+              <div class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" v-model="isAdvancePayment" class="sr-only peer">
+                <div class="w-11 h-6 bg-gray-600 rounded-full peer peer-checked:after:translate-x-full 
+                          peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 
+                          after:left-[2px] after:bg-white after:border-gray-300 after:border 
+                          after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500">
+                </div>
+              </div>
+            </label>
 
-            <button @click="selectedPaymentMethod = 'DEBIT_CARD'" :class="[
-              'flex flex-col items-center gap-2 p-3 rounded-lg transition-all duration-200',
-              selectedPaymentMethod === 'DEBIT_CARD'
-                ? 'bg-blue-500/20 border-2 border-blue-500/50'
-                : 'bg-gray-700/50 border border-gray-700/50 hover:bg-gray-700'
-            ]">
-              <CreditCard class="w-6 h-6" :class="selectedPaymentMethod === 'DEBIT_CARD' ? 'text-blue-400' : 'text-white'" />
-              <span class="text-sm text-white">Debit Card</span>
-            </button>
+            <transition name="fade">
+              <div v-if="isAdvancePayment" class="mt-4 space-y-4">
+                <div>
+                  <label class="text-sm text-gray-400 mb-2 block">Advance Amount</label>
+                  <div class="relative">
+                    <input 
+                      type="number"
+                      v-model="advanceAmount"
+                      :max="total"
+                      class="w-full bg-gray-600/50 border border-gray-500 rounded-lg px-3 py-2 text-white"
+                      @input="advanceAmount = Math.min(Math.max(0, advanceAmount), total)"
+                    />
+                    <div class="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">
+                      {{ ((advanceAmount / total) * 100).toFixed(0) }}%
+                    </div>
+                  </div>
+
+                  <!-- Payment Progress Bar -->
+                  <div class="mt-2 bg-gray-600 rounded-full h-2 overflow-hidden">
+                    <div class="bg-blue-500 h-full transition-all duration-300"
+                         :style="{ width: `${(advanceAmount / total) * 100}%` }">
+                    </div>
+                  </div>
+
+                  <!-- Payment Breakdown -->
+                  <div class="mt-4 space-y-2 text-sm">
+                    <div class="flex justify-between text-gray-400">
+                      <span>Advance Payment:</span>
+                      <span class="text-blue-400">{{ formatCurrency(advanceAmount) }}</span>
+                    </div>
+                    <div class="flex justify-between text-gray-400">
+                      <span>Remaining Balance:</span>
+                      <span class="text-yellow-400">{{ formatCurrency(remainingBalance) }}</span>
+                    </div>
+                    <div class="flex justify-between text-gray-400 pt-2 border-t border-gray-600">
+                      <span>Payment Status:</span>
+                      <span :class="{
+                        'text-green-400': paymentStatus === 'PAID',
+                        'text-yellow-400': paymentStatus === 'PARTIALLY_PAID',
+                        'text-red-400': paymentStatus === 'PENDING'
+                      }">
+                        {{ paymentStatus.replace('_', ' ') }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </transition>
           </div>
         </div>
 
@@ -920,7 +1227,7 @@ onMounted(async () => {
           </button>
           <button 
             @click="completeOrder"
-            :disabled="isProcessingOrder"
+            :disabled="isProcessingOrder || (isAdvancePayment && advanceAmount <= 0)"
             class="flex-1 py-3 px-4 bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors duration-200 
                    flex items-center justify-center gap-2 text-sm text-white disabled:opacity-50 
                    disabled:cursor-not-allowed disabled:hover:bg-blue-500">
@@ -933,7 +1240,7 @@ onMounted(async () => {
             </template>
             <template v-else>
               <Check class="w-5 h-5" />
-              <span>Complete Order</span>
+              <span>{{ isAdvancePayment ? 'Record Advance Payment' : 'Complete Order' }}</span>
             </template>
           </button>
         </div>
@@ -979,16 +1286,70 @@ onMounted(async () => {
               <div class="text-sm text-gray-600 uppercase tracking-wider mb-2">Payment Details</div>
               <div class="space-y-1 text-sm">
                 <div class="grid grid-cols-2">
-                  <span class="text-gray-600">Payment Method:</span>
-                  <span class="text-gray-800 font-medium">{{ selectedPaymentMethod }}</span>
+                  <span class="text-gray-600">Payment Status:</span>
+                  <span :class="{
+                    'text-green-600': paymentStatus === 'FULL_PAYMENT' || paymentStatus === 'PAID',
+                    'text-yellow-600': paymentStatus === 'PARTIALLY_PAID',
+                    'text-red-600': paymentStatus === 'PENDING'
+                  }">{{ paymentStatus.replace('_', ' ') }}</span>
                 </div>
                 <div class="grid grid-cols-2">
+                  <span class="text-gray-600">Payment Method:</span>
+                  <span class="text-gray-800 font-medium">
+                    {{ {
+                      'CASH': 'Cash Payment',
+                      'CARD': 'Card Payment',
+                      'CHECK': 'Check Payment',
+                      'ONLINE': 'Online Payment'
+                    }[selectedPaymentMethod] }}
+                  </span>
+                </div>
+                
+                <!-- Add Advance Payment Details -->
+                <template v-if="isAdvancePayment">
+                  <div class="grid grid-cols-2">
+                    <span class="text-gray-600">Total Amount:</span>
+                    <span class="text-gray-800">{{ formatCurrency(total) }}</span>
+                  </div>
+                  <div class="grid grid-cols-2">
+                    <span class="text-gray-600">Advance Paid:</span>
+                    <span class="text-green-600 font-medium">{{ formatCurrency(advanceAmount) }}</span>
+                  </div>
+                  <div class="grid grid-cols-2">
+                    <span class="text-gray-600">Balance Due:</span>
+                    <span class="text-red-600 font-medium">{{ formatCurrency(remainingBalance) }}</span>
+                  </div>
+                  <div class="grid grid-cols-2">
+                    <span class="text-gray-600">Payment Progress:</span>
+                    <span class="text-gray-800">{{ ((advanceAmount / total) * 100).toFixed(0) }}%</span>
+                  </div>
+                </template>
+
+                <!-- Regular Payment Terms -->
+                <div class="grid grid-cols-2">
                   <span class="text-gray-600">Payment Terms:</span>
-                  <span class="text-gray-800">Net 30</span>
+                  <span class="text-gray-800">{{ isAdvancePayment ? 'Partial Payment' : 'Net 30' }}</span>
                 </div>
                 <div class="grid grid-cols-2">
                   <span class="text-gray-600">Due Date:</span>
                   <span class="text-gray-800">{{ new Date(new Date().setDate(new Date().getDate() + 30)).toLocaleDateString() }}</span>
+                </div>
+              </div>
+
+              <!-- Add Payment Progress Bar for Advance Payments -->
+              <div v-if="isAdvancePayment" class="mt-4">
+                <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div class="h-full bg-blue-500 transition-all duration-300"
+                       :style="{ width: `${(advanceAmount / total) * 100}%` }"
+                       :class="{ 
+                         'bg-green-500': paymentStatus === 'PAID',
+                         'bg-yellow-500': paymentStatus === 'PARTIALLY_PAID',
+                         'bg-red-500': paymentStatus === 'PENDING'
+                       }">
+                  </div>
+                </div>
+                <div class="text-xs text-gray-500 mt-1 text-center">
+                  Payment Progress: {{ ((advanceAmount / total) * 100).toFixed(0) }}% Complete
                 </div>
               </div>
             </div>
@@ -999,31 +1360,38 @@ onMounted(async () => {
             <table class="w-full">
               <thead>
                 <tr class="bg-gray-100">
+                  <th class="py-3 px-4 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Code</th>
                   <th class="py-3 px-4 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Description</th>
-                  <th class="py-3 px-4 text-right text-xs font-medium text-gray-600 uppercase tracking-wider">Unit Price</th>
-                  <th class="py-3 px-4 text-center text-xs font-medium text-gray-600 uppercase tracking-wider">Quantity</th>
-                  <th class="py-3 px-4 text-right text-xs font-medium text-gray-600 uppercase tracking-wider">Discount</th>
+                  <th class="py-3 px-4 text-right text-xs font-medium text-gray-600 uppercase tracking-wider">Dimension - Inches</th>
+                  <th class="py-3 px-4 text-right text-xs font-medium text-gray-600 uppercase tracking-wider">Rate</th>
+                  <th class="py-3 px-4 text-center text-xs font-medium text-gray-600 uppercase tracking-wider">Qty</th>
                   <th class="py-3 px-4 text-right text-xs font-medium text-gray-600 uppercase tracking-wider">Amount</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-200">
                 <tr v-for="item in orderItems" :key="item.id" class="text-sm">
+                  <td class="py-4 px-4 text-gray-800">{{ item.id.toString().padStart(4, '0') }}</td>
                   <td class="py-4 px-4">
                     <div class="font-medium text-gray-800">{{ item.name }}</div>
-                    <div class="text-gray-500 text-xs">Item #{{ item.id.toString().padStart(4, '0') }}</div>
+                    <div class="text-gray-500 text-xs">{{ item.description || '-' }}</div>
                   </td>
-                  <td class="py-4 px-4 text-right text-gray-800">Rs. {{ item.price.toLocaleString() }}</td>
-                  <td class="py-4 px-4 text-center text-gray-800">{{ item.quantity }}</td>
                   <td class="py-4 px-4 text-right text-gray-800">
-                    <template v-if="item.productDiscount > 0">
-                      <span class="text-red-600">-{{ item.productDiscount }}%</span>
-                      <div class="text-xs text-gray-500">
-                        (-Rs. {{ ((item.price * item.quantity * item.productDiscount) / 100).toLocaleString() }})
-                      </div>
+                    <template v-if="item.dimensions">
+                      <div>{{ `${item.width}" × ${item.height}"` }}</div>
+                      <div class="text-sm text-green-600">{{ `${item.totalAreaMeters} m²` }}</div>
                     </template>
                     <span v-else>-</span>
                   </td>
-                  <td class="py-4 px-4 text-right font-medium text-gray-800">Rs. {{ getItemTotal(item).toLocaleString() }}</td>
+                  <td class="py-4 px-4 text-right text-gray-800">
+                    Rs. {{ (item.price * (1 - item.productDiscount / 100)).toLocaleString() }}
+                    <div v-if="item.productDiscount > 0" class="text-xs text-red-600">
+                      (-{{ item.productDiscount }}%)
+                    </div>
+                  </td>
+                  <td class="py-4 px-4 text-center text-gray-800">{{ item.quantity }}</td>
+                  <td class="py-4 px-4 text-right font-medium text-gray-800">
+                    Rs. {{ getItemTotal(item).toLocaleString() }}
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -1100,6 +1468,115 @@ onMounted(async () => {
             <Printer class="w-5 h-5" />
             <span>Print Receipt</span>
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Customer Selection Modal -->
+    <div v-if="isCustomerModalOpen" 
+         class="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" 
+           @click="isCustomerModalOpen = false"></div>
+      
+      <div class="relative bg-gray-800 rounded-lg shadow-xl w-full max-w-3xl z-10 animate-scale-in">
+        <!-- Modal Header -->
+        <div class="p-6 border-b border-gray-700">
+          <div class="flex justify-between items-center">
+            <div>
+              <h2 class="text-xl font-bold text-white">Customer Selection</h2>
+              <p class="text-gray-400 text-sm mt-1">Select a customer for this transaction</p>
+            </div>
+            <button @click="isCustomerModalOpen = false" 
+                    class="p-2 hover:bg-gray-700/50 rounded-full transition-colors">
+              <X class="w-5 h-5" />
+            </button>
+          </div>
+          
+          <!-- Search Bar -->
+          <div class="mt-6 relative">
+            <input type="text"
+                   v-model="customerSearchQuery"
+                   placeholder="Search by name, phone, or email..."
+                   class="w-full bg-gray-700/50 border border-gray-600/50 rounded-lg pl-12 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+            <Search class="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+          </div>
+        </div>
+        
+        <!-- Customer List -->
+        <div class="p-6 max-h-[60vh] overflow-auto custom-scrollbar">
+          <div v-if="filteredCustomers.length === 0" 
+               class="text-center py-8">
+            <User class="w-12 h-12 mx-auto text-gray-500 mb-3" />
+            <p class="text-gray-400 font-medium">No customers found</p>
+            <p class="text-gray-500 text-sm mt-1">Try adjusting your search terms</p>
+          </div>
+          
+          <div v-else class="grid gap-3">
+            <button v-for="customer in filteredCustomers"
+                    :key="customer.id"
+                    @click="selectCustomer(customer)"
+                    :class="[
+                      'w-full text-left p-4 rounded-lg transition-all duration-200 border',
+                      selectedCustomer?.id === customer.id
+                        ? 'bg-blue-500/20 border-blue-500/50'
+                        : 'hover:bg-gray-700/50 border-gray-700/50 hover:border-gray-600'
+                    ]">
+              <div class="flex items-start gap-4">
+                <!-- Customer Avatar/Icon -->
+                <div :class="[
+                  'p-3 rounded-full',
+                  selectedCustomer?.id === customer.id
+                    ? 'bg-blue-500/20 text-blue-400'
+                    : 'bg-gray-700/50 text-gray-400'
+                ]">
+                  <User class="w-6 h-6" />
+                </div>
+                
+                <!-- Customer Info -->
+                <div class="flex-1">
+                  <div class="flex items-start justify-between">
+                    <div>
+                      <div class="font-medium text-white text-lg">{{ customer.name }}</div>
+                      <div class="grid gap-1 mt-2">
+                        <div v-if="customer.phone" class="flex items-center gap-2 text-sm text-gray-400">
+                          <phone-icon class="w-4 h-4" />
+                          {{ customer.phone }}
+                        </div>
+                        <div v-if="customer.email" class="flex items-center gap-2 text-sm text-gray-400">
+                          <mail-icon class="w-4 h-4" />
+                          {{ customer.email }}
+                        </div>
+                        <div class="flex items-center gap-2 text-sm text-gray-500">
+                          <tag-icon class="w-4 h-4" />
+                          ID: #{{ customer.id.toString().padStart(4, '0') }}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div v-if="selectedCustomer?.id === customer.id" 
+                         class="text-blue-400">
+                      <Check class="w-6 h-6" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </button>
+          </div>
+        </div>
+        
+        <!-- Modal Footer -->
+        <div class="p-6 border-t border-gray-700">
+          <div class="flex justify-end gap-3">
+            <button @click="isCustomerModalOpen = false"
+                    class="px-4 py-2 text-gray-400 hover:text-white transition-colors">
+              Cancel
+            </button>
+            <button @click="isCustomerModalOpen = false"
+                    class="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center gap-2">
+              <Check class="w-5 h-5" />
+              Confirm Selection
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -1323,7 +1800,7 @@ input[type="range"]::-moz-range-thumb {
 
 input[type="range"]::-moz-range-thumb:hover {
   transform: scale(1.1);
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 0 0 4px rgba(59,  130, 246, 0.3);
 }
 
 @keyframes spin {
@@ -1352,4 +1829,3 @@ input[type="range"]::-moz-range-thumb:hover {
   }
 }
 </style>
-``` 
