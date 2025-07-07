@@ -440,7 +440,10 @@ const handleAdvancePayment = async () => {
         product_id: item.id,
         quantity: item.quantity,
         price: item.price,
-        product_discount: item.productDiscount
+        product_discount: item.productDiscount,
+        width: item.width || null,
+        height: item.height || null,
+        totalAreaMeters: item.totalAreaMeters || null
       }))
     };
 
@@ -496,9 +499,14 @@ const completeOrder = async () => {
       throw new Error('No cashier ID found. Please login again.');
     }
 
+    // Ensure checkDetails.amount is set to total for check payments
+    if (selectedPaymentMethod.value === 'CHECK') {
+      checkDetails.value.amount = total.value;
+    }
+
     const salesData = {
       time: new Date().toISOString(),
-      status: isAdvancePayment.value ? 2 : 1, // 2 for partially paid, 1 for fully paid
+      status: isAdvancePayment.value ? 2 : 1,
       payment_type: selectedPaymentMethod.value,
       amount: total.value,
       advance_amount: isAdvancePayment.value ? advanceAmount.value : total.value,
@@ -512,9 +520,17 @@ const completeOrder = async () => {
         product_id: item.id,
         quantity: item.quantity,
         price: item.price,
-        product_discount: item.productDiscount // Include product discount
+        product_discount: item.productDiscount,
+        width: item.width || null,
+        height: item.height || null,
+        totalAreaMeters: item.totalAreaMeters || null
       }))
     };
+
+    // Add check_details if payment type is CHECK
+    if (selectedPaymentMethod.value === 'CHECK') {
+      salesData.check_details = { ...checkDetails.value };
+    }
 
     const response = await connection.post('/sales', salesData);
     console.log('Order Response:', response.data);
@@ -743,6 +759,40 @@ const selectWalkInCustomer = () => {
   clearSelectedCustomer()
   isCustomerModalOpen.value = false
 }
+
+const checkDetails = ref({
+  bankName: '',
+  checkNumber: '',
+  checkDate: new Date().toISOString().split('T')[0],
+  amount: 0,
+  remarks: ''
+})
+
+const showCheckForm = computed(() => selectedPaymentMethod.value === 'CHECK')
+
+// Add this method after other methods
+const handleCheckPaymentSubmit = () => {
+  if (!checkDetails.value.bankName || !checkDetails.value.checkNumber) {
+    Swal.fire({
+      title: 'Missing Details',
+      text: 'Please fill in all required fields',
+      icon: 'warning',
+      background: '#1e293b',
+      color: '#ffffff'
+    })
+    return
+  }
+  
+  // Store check details and proceed with payment
+  completeOrder()
+}
+
+// Modify the watch section to handle check amount
+watch(() => total.value, (newTotal) => {
+  if (selectedPaymentMethod.value === 'CHECK') {
+    checkDetails.value.amount = newTotal
+  }
+})
 </script>
 
 <template>
@@ -1160,7 +1210,7 @@ const selectWalkInCustomer = () => {
             <label class="flex items-center justify-between">
               <span class="text-sm text-gray-300">Enable Advance Payment</span>
               <div class="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" v-model="isAdvancePayment" class="sr-only peer">
+                <input type="checkbox" v-model="isAdvancePayment" class="sr-only peer" />
                 <div class="w-11 h-6 bg-gray-600 rounded-full peer peer-checked:after:translate-x-full 
                           peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 
                           after:left-[2px] after:bg-white after:border-gray-300 after:border 
@@ -1220,14 +1270,72 @@ const selectWalkInCustomer = () => {
           </div>
         </div>
 
+        <!-- Add this inside your payment modal, after the payment method selection -->
+        <transition name="fade">
+          <div v-if="showCheckForm" class="mt-4 bg-gray-700/30 rounded-lg p-4 space-y-4">
+            <div class="text-sm font-medium text-gray-300 mb-2">Check Payment Details</div>
+            
+            <div class="space-y-3">
+              <div>
+                <label class="block text-sm text-gray-400 mb-1">Bank Name</label>
+                <input 
+                  type="text"
+                  v-model="checkDetails.bankName"
+                  class="w-full bg-gray-600/50 border border-gray-500 rounded-lg px-3 py-2 text-white placeholder-gray-400"
+                  placeholder="Enter bank name"
+                />
+              </div>
+
+              <div>
+                <label class="block text-sm text-gray-400 mb-1">Check Number</label>
+                <input 
+                  type="text"
+                  v-model="checkDetails.checkNumber"
+                  class="w-full bg-gray-600/50 border border-gray-500 rounded-lg px-3 py-2 text-white placeholder-gray-400"
+                  placeholder="Enter check number"
+                />
+              </div>
+
+              <div>
+                <label class="block text-sm text-gray-400 mb-1">Check Date</label>
+                <input 
+                  type="date"
+                  v-model="checkDetails.checkDate"
+                  class="w-full bg-gray-600/50 border border-gray-500 rounded-lg px-3 py-2 text-white"
+                />
+              </div>
+
+              <div>
+                <label class="block text-sm text-gray-400 mb-1">Amount</label>
+                <input 
+                  type="number"
+                  v-model="checkDetails.amount"
+                  readonly
+                  class="w-full bg-gray-600/50 border border-gray-500 rounded-lg px-3 py-2 text-white cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label class="block text-sm text-gray-400 mb-1">Remarks (Optional)</label>
+                <textarea 
+                  v-model="checkDetails.remarks"
+                  rows="2"
+                  class="w-full bg-gray-600/50 border border-gray-500 rounded-lg px-3 py-2 text-white placeholder-gray-400"
+                  placeholder="Add any additional notes"
+                ></textarea>
+              </div>
+            </div>
+          </div>
+        </transition>
+
         <div class="flex gap-3">
           <button @click="isPaymentModalOpen = false"
             class="flex-1 py-3 px-4 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors duration-200 text-sm text-white">
             Cancel
           </button>
           <button 
-            @click="completeOrder"
-            :disabled="isProcessingOrder || (isAdvancePayment && advanceAmount <= 0)"
+            @click="selectedPaymentMethod === 'CHECK' ? handleCheckPaymentSubmit() : completeOrder()"
+            :disabled="isProcessingOrder || (isAdvancePayment && advanceAmount <= 0) || (selectedPaymentMethod === 'CHECK' && (!checkDetails.bankName || !checkDetails.checkNumber))"
             class="flex-1 py-3 px-4 bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors duration-200 
                    flex items-center justify-center gap-2 text-sm text-white disabled:opacity-50 
                    disabled:cursor-not-allowed disabled:hover:bg-blue-500">
@@ -1240,7 +1348,7 @@ const selectWalkInCustomer = () => {
             </template>
             <template v-else>
               <Check class="w-5 h-5" />
-              <span>{{ isAdvancePayment ? 'Record Advance Payment' : 'Complete Order' }}</span>
+              <span>{{ selectedPaymentMethod === 'CHECK' ? 'Process Check Payment' : (isAdvancePayment ? 'Record Advance Payment' : 'Complete Order') }}</span>
             </template>
           </button>
         </div>

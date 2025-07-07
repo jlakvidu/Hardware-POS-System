@@ -17,8 +17,12 @@ return new class extends Migration
             $table->id();
             $table->dateTime('time');
             $table->boolean('status');
-            $table->enum('payment_type', ['CASH', 'CREDIT_CARD', 'DEBIT_CARD']);
+            $table->enum('payment_type', ['CASH', 'CARD', 'CHECK', 'ONLINE']);
             $table->double('amount');
+            $table->decimal('advance_amount', 10, 2)->default(0.00);
+            $table->decimal('remaining_balance', 10, 2)->default(0.00);
+            $table->string('payment_status')->default('FULL_PAYMENT');
+            $table->json('check_details')->nullable();
             $table->double('cart_discount')->default(0); // Renamed from discount to cart_discount
             $table->double('product_discounts_total')->default(0); // New column for sum of product discounts
             $table->double('total_discount_amount')->default(0); // New column for total discount amount

@@ -45,17 +45,31 @@ class SalesController extends Controller
         try {
             $validated = $request->validate([
                 'cashier_id' => 'required',
-                'payment_type' => 'required|in:CASH,CREDIT_CARD,DEBIT_CARD',
+                'payment_type' => 'required|in:CASH,CARD,CHECK,ONLINE',
                 'items' => 'required|array',
                 'items.*.product_id' => 'required|exists:products,id',
                 'items.*.quantity' => 'required|numeric|min:1',
                 'items.*.price' => 'required|numeric|min:0',
-                'discount' => 'required|numeric|min:0|max:100',
+                'items.*.product_discount' => 'nullable|numeric|min:0|max:100',
+                'cart_discount' => 'nullable|numeric|min:0|max:100',
+                'advance_amount' => 'nullable|numeric|min:0',
+                'amount' => 'required|numeric|min:0',
+                'remaining_balance' => 'nullable|numeric|min:0',
+                'payment_status' => 'required|string',
+                'customer_id' => 'nullable|exists:customers,id',
+                'check_details' => 'nullable|array',
+                'check_details.bankName' => 'required_if:payment_type,CHECK',
+                'check_details.checkNumber' => 'required_if:payment_type,CHECK',
+                'check_details.checkDate' => 'required_if:payment_type,CHECK|date',
+                'check_details.amount' => 'required_if:payment_type,CHECK|numeric|min:0',
+                'check_details.remarks' => 'nullable|string',
+                'items.*.width' => 'nullable|numeric|min:0',
+                'items.*.height' => 'nullable|numeric|min:0',
+                'items.*.totalAreaMeters' => 'nullable|numeric|min:0',
             ]);
 
             $total = 0;
             $productDiscountsTotal = 0;
-
             foreach ($request->get('items') as $item) {
                 $itemSubtotal = $item['price'] * $item['quantity'];
                 $itemDiscountAmount = ($itemSubtotal * ($item['product_discount'] ?? 0)) / 100;
@@ -63,19 +77,35 @@ class SalesController extends Controller
                 $total += $itemSubtotal - $itemDiscountAmount;
             }
 
-            $cartDiscountAmount = ($total * $request->get('discount')) / 100;
+            $cartDiscount = $request->get('cart_discount', 0);
+            $cartDiscountAmount = ($total * $cartDiscount) / 100;
             $finalTotal = $total - $cartDiscountAmount;
+
+            $advanceAmount = $request->get('advance_amount', $finalTotal);
+            $remainingBalance = $request->get('remaining_balance', $finalTotal - $advanceAmount);
+
+            $paymentStatus = $request->get('payment_status', 'FULL_PAYMENT');
+            $status = $paymentStatus === 'FULL_PAYMENT' || $paymentStatus === 'PAID' ? 1 : 2;
+
+            $checkDetails = null;
+            if ($request->payment_type === 'CHECK' && $request->has('check_details')) {
+                $checkDetails = json_encode($request->check_details);
+            }
 
             $salesRecord = [
                 'customer_id' => $request->get('customer_id'),
                 'cashier_id' => $request->get('cashier_id'),
-                'payment_type' => $request->get('payment_type'),
+                'payment_type' => $request->payment_type,
                 'time' => now(),
-                'status' => 1,
+                'status' => $status,
                 'amount' => $finalTotal,
-                'cart_discount' => $request->get('discount'),
+                'advance_amount' => $advanceAmount,
+                'remaining_balance' => $remainingBalance,
+                'payment_status' => $paymentStatus,
+                'cart_discount' => $cartDiscount,
                 'product_discounts_total' => $productDiscountsTotal,
-                'total_discount_amount' => $productDiscountsTotal + $cartDiscountAmount
+                'total_discount_amount' => $productDiscountsTotal + $cartDiscountAmount,
+                'check_details' => $checkDetails,
             ];
 
             DB::beginTransaction();
@@ -87,19 +117,23 @@ class SalesController extends Controller
 
                 foreach ($request->get('items') as $item) {
                     $product = $products->get($item['product_id']);
-
                     if (!$product) {
                         throw new \Exception("Product with ID {$item['product_id']} not found.");
                     }
-
                     $inventory = $product->inventory;
-
                     if (!$inventory) {
                         throw new \Exception("Inventory for Product with ID {$item['product_id']} not found.");
                     }
-
                     if ($inventory->quantity < $item['quantity']) {
                         throw new \Exception('Not enough stock for product ID ' . $item['product_id']);
+                    }
+
+                    // Map frontend fields to DB columns
+                    $widthInch = isset($item['width']) ? $item['width'] : null;
+                    $heightInch = isset($item['height']) ? $item['height'] : null;
+                    $areaSqm = isset($item['totalAreaMeters']) ? $item['totalAreaMeters'] : null;
+                    if ($areaSqm === null && $widthInch !== null && $heightInch !== null) {
+                        $areaSqm = round($widthInch * $heightInch * 0.00064516, 4);
                     }
 
                     Product_Sales::create([
@@ -107,12 +141,25 @@ class SalesController extends Controller
                         'product_id' => $item['product_id'],
                         'quantity' => $item['quantity'],
                         'price' => $item['price'],
+                        'width_inch' => $widthInch,
+                        'height_inch' => $heightInch,
+                        'area_sqm' => $areaSqm,
                     ]);
-
                     $inventory->quantity = round($inventory->quantity - $item['quantity'], 2);
                     $inventory->save();
-
                     $this->updateInventoryStatus($inventory);
+                }
+
+                // Store check payment details if payment_type is CHECK
+                if ($request->payment_type === 'CHECK' && $request->has('check_details')) {
+                    \App\Models\CheckPayment::create([
+                        'sales_id' => $sales->id,
+                        'bank_name' => $request->check_details['bankName'],
+                        'check_number' => $request->check_details['checkNumber'],
+                        'check_date' => $request->check_details['checkDate'],
+                        'amount' => $request->check_details['amount'],
+                        'remarks' => $request->check_details['remarks'] ?? null,
+                    ]);
                 }
 
                 DB::commit();
@@ -124,14 +171,17 @@ class SalesController extends Controller
 
             } catch (\Throwable $th) {
                 DB::rollBack();
-                return response()->json([
-                    'error' => 'An error occurred while creating a new sales record',
-                    'details' => $th->getMessage()
-                ], 500);
+                throw $th;
             }
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Failed to process payment',
+                'message' => $e->getMessage()
+            ], 500);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
-                'message' => 'The given data was invalid.',
+                'message' => 'Validation failed',
                 'errors' => $e->errors(),
             ], 422);
         }
@@ -150,7 +200,7 @@ class SalesController extends Controller
         try {
             $request->validate([
                 'cashier_id' => 'required',
-                'payment_type' => 'required|in:CASH,CREDIT_CARD,DEBIT_CARD',
+                'payment_type' => 'required|in:CASH,CARD,CHECK,ONLINE',
                 'items' => 'required',
                 'status' => 'required',
             ]);
@@ -528,5 +578,77 @@ class SalesController extends Controller
         return response()->json([
             'payment_distribution' => $paymentDistribution
         ]);
+    }
+
+    // Add this new method for completing pending payments
+    public function completePayment(Request $request, $id)
+    {
+        try {
+            $validated = $request->validate([
+                'payment_amount' => 'required|numeric|min:0',
+                'payment_method' => 'required|in:CASH,CARD,CHECK,ONLINE',
+                'payment_info' => 'required_if:payment_method,CHECK,CARD,ONLINE|array'
+            ]);
+
+            $sale = Sales::findOrFail($id);
+            
+            if ($sale->payment_status === 'PAID') {
+                return response()->json([
+                    'message' => 'This sale is already fully paid'
+                ], 400);
+            }
+
+            $newPaymentAmount = $request->payment_amount;
+            if ($newPaymentAmount > $sale->remaining_balance) {
+                return response()->json([
+                    'message' => 'Payment amount cannot exceed remaining balance',
+                    'remaining_balance' => $sale->remaining_balance
+                ], 400);
+            }
+
+            DB::beginTransaction();
+
+            // Process new payment info
+            $paymentInfo = array_merge($request->get('payment_info', []), [
+                'amount' => $request->payment_amount,
+                'date' => now(),
+                'type' => $request->payment_method
+            ]);
+
+            // Get existing payment info and append new payment
+            $existingInfo = json_decode($sale->payment_info ?? '[]', true);
+            if (!is_array($existingInfo)) {
+                $existingInfo = [];
+            }
+            $existingInfo[] = $paymentInfo;
+
+            // Update sale
+            $sale->paid_amount += $request->payment_amount;
+            $sale->balance_amount -= $request->payment_amount;
+            $sale->payment_method = $request->payment_method;
+            $sale->payment_info = json_encode($existingInfo);
+            
+            if ($sale->balance_amount <= 0) {
+                $sale->payment_status = 'PAID';
+                $sale->status = 1;
+            } else {
+                $sale->payment_status = 'PARTIALLY_PAID';
+            }
+
+            $sale->save();
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Payment updated successfully',
+                'data' => $sale
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Failed to process payment',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }

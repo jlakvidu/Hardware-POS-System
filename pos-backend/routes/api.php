@@ -118,6 +118,7 @@ Route::post('/sales', [SalesController::class, 'store']);
 Route::get('/sales/{id}', [SalesController::class, 'show']); // Changed from 'view' to 'show'
 Route::put('/sales/{id}', [SalesController::class, 'update']);
 Route::get('/sales/customer/{id}', [SalesController::class, 'customerSales']);
+Route::post('/sales/{id}/complete-payment', [SalesController::class, 'completePayment']);
 
 // return sales
 Route::get('/return', [ReturnItemsController::class, 'index']);

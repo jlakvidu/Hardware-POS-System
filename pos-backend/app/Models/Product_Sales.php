@@ -8,10 +8,14 @@ class Product_Sales extends Model
 {
     protected $table = 'product_sales';
     protected $fillable = [
-        'product_id',
         'sales_id',
+        'product_id',
         'quantity',
-        'price'
+        'price',
+        'width_inch',
+        'height_inch',
+        'area_sqm',
+        // ...other fields...
     ];
 
     public function product()
