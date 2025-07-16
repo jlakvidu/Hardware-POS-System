@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('email');
+            $table->string('address')->nullable(); // <-- Added address column
             $table->softDeletes();
             $table->timestamps();
         });

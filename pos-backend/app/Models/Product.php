@@ -11,21 +11,10 @@ class Product extends Model
     use HasFactory;
     protected $fillable = [
         'name',
+        'model',
         'price',
-        'seller_price',
-        'profit',
-        'discount', // Normal discount
-        'selling_discount', // Ensure this line exists
-        'tax',
-        'size',
-        'color',
-        'description',
-        'bar_code',
-        'brand_name',
-        'inventory_id',
         'supplier_id',
-        'admin_id',
-        'calculate_length'
+        'inventory_id',
     ];
 
     public function inventory(): BelongsTo

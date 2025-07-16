@@ -17,7 +17,6 @@ return new class extends Migration
             $table->decimal('quantity' , 10,2)->default(0);
             $table->dateTime('restock_date_time')->useCurrent()->nullable();
             $table->integer('added_stock_amount')->nullable()->default(0);
-            $table->string('location');
             $table->String('status')->default('In Stock');
             $table->timestamps();
         });

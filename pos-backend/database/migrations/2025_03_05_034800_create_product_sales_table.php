@@ -18,8 +18,11 @@ return new class extends Migration
             $table->double('price');
             $table->timestamps();
             $table->primary(['sales_id', 'product_id']);
-            // $table->foreign('product_id')->references('id')->on('products')->onDelete('cascade');
-            // $table->foreign('sales_id')->references('id')->on('sales')->onDelete('cascade');
+            $table->foreign('product_id')->references('id')->on('products')->onDelete('cascade');
+            $table->foreign('sales_id')->references('id')->on('sales')->onDelete('cascade');
+            $table->double('width_inch')->nullable();
+            $table->double('height_inch')->nullable();
+            $table->double('area_sqm')->nullable();
         });
     }
 

@@ -14,7 +14,6 @@ class Inventory extends Model
         'quantity',
         'restock_date_time',
         'added_stock_amount',
-        'location',
         'status'
     ];
 
@@ -27,5 +26,5 @@ class Inventory extends Model
     public function product(): HasOne
     {
         return $this->hasOne(Product::class, 'inventory_id');
-    }
+}
 }

@@ -152,31 +152,19 @@ const fetchProducts = async () => {
     try {
         const response = await connection.get('/products')
         products.value = response.data.data.map(product => {
-            const sellerPriceWithDiscount = product.seller_price * (1 - product.discount / 100)
-            const normalPriceWithSellingDiscount = product.price * (1 - product.selling_discount / 100)
-            const profitPercentage = ((normalPriceWithSellingDiscount - sellerPriceWithDiscount) / product.price) * 100
-            const profitValue = product.price * (profitPercentage / 100)
-
+            // Only use fields that exist in your backend and inventory
             return {
                 id: product.id,
                 name: product.name,
+                model: product.model,
                 price: product.price,
-                seller_price: product.seller_price,
-                discount: product.discount,
-                selling_discount: product.selling_discount,
-                tax: product.tax,
-                size: product.size,
-                color: product.color,
-                description: product.description,
-                bar_code: product.bar_code,
-                brand_name: product.brand_name,
                 inventory_id: product.inventory_id,
                 supplier_id: product.supplier_id,
-                admin_id: product.admin_id,
-                calculate_length: product.calculate_length,
-                created_at: product.created_at,
-                updated_at: product.updated_at,
-                profit: profitValue.toFixed(2) // Include calculated profit value
+                // Inventory fields
+                quantity: product.inventory?.quantity ?? null,
+                restock_date_time: product.inventory?.restock_date_time ?? null,
+                added_stock_amount: product.inventory?.added_stock_amount ?? null,
+                status: product.inventory?.status ?? null,
             }
         })
 
@@ -427,54 +415,37 @@ const handleAddProduct = async () => {
 }
 
 const openEditModal = (product) => {
-    console.log('Product data:', product); // Debug the product data
-    // Ensure all required fields are included and properly initialized
+    // Only include backend fields
     editingProduct.value = {
         id: product.id,
         name: product.name,
+        model: product.model,
         price: product.price,
-        profit: product.profit,
-        seller_price: product.seller_price,
-        discount: product.discount,
-        tax: product.tax,
-        size: product.size,
-        color: product.color,
-        description: product.description,
-        bar_code: product.bar_code,
-        brand_name: product.brand_name,
         inventory_id: product.inventory_id,
         supplier_id: product.supplier_id,
-        admin_id: product.admin_id,
-        calculate_length: !!product.calculate_length, // Ensure boolean value
-        selling_discount: product.selling_discount ?? 0, // Use nullish coalescing to default to 0 if undefined or null
+        // Inventory fields for reference (not editable here)
+        quantity: product.quantity,
+        restock_date_time: product.restock_date_time,
+        added_stock_amount: product.added_stock_amount,
+        status: product.status,
     };
     showEditModal.value = true;
 };
 
 const handleEditProduct = async () => {
+    // Only send backend fields
+    const payload = {
+        name: editingProduct.value.name,
+        model: editingProduct.value.model,
+        price: parseFloat(editingProduct.value.price),
+        inventory_id: parseInt(editingProduct.value.inventory_id),
+        supplier_id: parseInt(editingProduct.value.supplier_id),
+    }
+
     if (!validateForm(editingProduct.value)) return
     isUpdatingProduct.value = true
 
     try {
-        const payload = {
-            name: editingProduct.value.name,
-            price: parseFloat(editingProduct.value.price),
-            profit: parseFloat(editingProduct.value.profit),
-            seller_price: parseFloat(editingProduct.value.seller_price),
-            discount: parseFloat(editingProduct.value.discount),
-            tax: parseFloat(editingProduct.value.tax),
-            size: editingProduct.value.size,
-            color: editingProduct.value.color,
-            description: editingProduct.value.description,
-            bar_code: editingProduct.value.bar_code,
-            brand_name: editingProduct.value.brand_name,
-            inventory_id: parseInt(editingProduct.value.inventory_id),
-            supplier_id: parseInt(editingProduct.value.supplier_id),
-            admin_id: parseInt(editingProduct.value.admin_id),
-            calculate_length: !!editingProduct.value.calculate_length, // Ensure boolean value
-            selling_discount: parseFloat(editingProduct.value.selling_discount) || 0, // Include selling_discount
-        }
-
         const response = await connection.put(`/products/${editingProduct.value.id}`, payload)
 
         if (response.data.status === 'success') {
@@ -672,8 +643,20 @@ const refreshData = async () => {
 }
 
 const openViewModal = (product) => {
-    viewingProduct.value = product
-    showViewModal.value = true
+    // Only show backend fields
+    viewingProduct.value = {
+        id: product.id,
+        name: product.name,
+        model: product.model,
+        price: product.price,
+        inventory_id: product.inventory_id,
+        supplier_id: product.supplier_id,
+        quantity: product.quantity,
+        restock_date_time: product.restock_date_time,
+        added_stock_amount: product.added_stock_amount,
+        status: product.status,
+    };
+    showViewModal.value = true;
 }
 
 const restoreFormData = () => {
@@ -829,152 +812,82 @@ onUnmounted(() => {
                         <table class="w-full table-auto">
                             <thead class="sticky top-0">
                                 <tr class="bg-gray-700/90 backdrop-blur-sm">
-                                    <th @click="toggleSort('id')"
-                                        class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600/50 transition-colors">
-                                        <div class="flex items-center space-x-1">
-                                            <span>ID</span>
-                                            <component :is="getSortIcon('id')" class="w-4 h-4" />
-                                        </div>
-                                    </th>
-                                    <th @click="toggleSort('name')"
-                                        class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600/50 transition-colors">
-                                        <div class="flex items-center space-x-1">
-                                            <span>Name</span>
-                                            <component :is="getSortIcon('name')" class="w-4 h-4" />
-                                        </div>
-                                    </th>
-                                    <th @click="toggleSort('price')"
-                                        class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600/50 transition-colors">
-                                        <div class="flex items-center space-x-1">
-                                            <span>Price</span>
-                                            <component :is="getSortIcon('price')" class="w-4 h-4" />
-                                        </div>
-                                    </th>
-                                    <th @click="toggleSort('seller_price')"
-                                        class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600/50 transition-colors">
-                                        <div class="flex items-center space-x-1">
-                                            <span>Seller Price</span>
-                                            <component :is="getSortIcon('seller_price')" class="w-4 h-4" />
-                                        </div>
-                                    </th>
-                                    
-                                    <th @click="toggleSort('brand_name')"
-                                        class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600/50 transition-colors">
-                                        <div class="flex items-center space-x-1">
-                                            <span>Brand</span>
-                                            <component :is="getSortIcon('brand_name')" class="w-4 h-4" />
-                                        </div>
-                                    </th>
-                                    <th @click="toggleSort('inventory_id')"
-                                        class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600/50 transition-colors">
-                                        <div class="flex items-center space-x-1">
-                                            <span>Inventory ID</span>
-                                            <component :is="getSortIcon('inventory_id')" class="w-4 h-4" />
-                                        </div>
-                                    </th>
-                                    <th @click="toggleSort('supplier_id')"
-                                        class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600/50 transition-colors">
-                                        <div class="flex items-center space-x-1">
-                                            <span>Supplier ID</span>
-                                            <component :is="getSortIcon('supplier_id')" class="w-4 h-4" />
-                                        </div>
-                                    </th>
-                                    <th
-                                        class="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
-                                        Actions
-                                    </th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">ID</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Name</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Model</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Price</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Inventory ID</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Supplier ID</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Quantity</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Restock Date</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Added Stock</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Status</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-700/50">
-                                <tr v-if="isLoading" class="hover:bg-gray-700">
-                                    <td colspan="10" class="h-[400px] relative">
-                                        <div
-                                            class="absolute inset-0 flex flex-col items-center justify-center space-y-4">
+                                <tr v-if="isLoading">
+                                    <td colspan="11" class="h-[400px] relative">
+                                        <div class="absolute inset-0 flex flex-col items-center justify-center space-y-4">
                                             <div class="loader-container">
                                                 <div class="loader">
                                                     <svg class="circular" viewBox="25 25 50 50">
                                                         <defs>
-                                                            <linearGradient id="gradient" x1="0%" y1="0%" x2="100%">
+                                                            <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
                                                                 <stop offset="0%" stop-color="#3b82f6" />
                                                                 <stop offset="50%" stop-color="#8b5cf6" />
                                                                 <stop offset="100%" stop-color="#ec4899" />
                                                             </linearGradient>
                                                         </defs>
-                                                        <circle class="path" cx="50" cy="50" r="20" fill="none"
-                                                            stroke="url(#gradient)" stroke-width="3"
-                                                            stroke-miterlimit="10" />
+                                                        <circle class="path" cx="50" cy="50" r="20" fill="none" stroke="url(#gradient)" stroke-width="3" stroke-miterlimit="10"/>
                                                     </svg>
                                                 </div>
                                             </div>
-                                            <div
-                                                class="text-base font-medium text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 animate-pulse">
+                                            <div class="text-base font-medium text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 animate-pulse">
                                                 Loading products...
                                             </div>
                                         </div>
                                     </td>
                                 </tr>
-                                <template v-else>
-                                    <tr v-if="filteredProducts.length === 0" class="hover:bg-gray-700">
-                                        <td colspan="10" class="px-6 py-8 text-center text-gray-400">
-                                            No products available
-                                        </td>
-                                    </tr>
-                                    <tr v-else v-for="product in filteredProducts" :key="product.id"
-                                        class="hover:bg-gray-700/30 transition-colors duration-200">
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                            <span class="font-mono bg-gray-700/50 px-2 py-1 rounded text-gray-300">{{
-                                                product.id }}</span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm">{{ product.name }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                            ${{ Number(product.price).toFixed(2) }}
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                            ${{ Number(product.seller_price).toFixed(2) }}
-                                        </td>
-                                       
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                            <span
-                                                class="px-2 py-1 text-xs rounded-full bg-yellow-500/20 text-yellow-300 border border-yellow-500/30">
-                                                {{ product.brand_name }}
-                                            </span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                            <span class="font-mono bg-gray-700/50 px-2 py-1 rounded text-gray-300">
-                                                {{ product.inventory_id }}
-                                            </span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                            <span class="font-mono bg-gray-700/50 px-2 py-1 rounded text-gray-300">
-                                                {{ product.supplier_id }}
-                                            </span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
-                                            <div class="flex items-center justify-end space-x-2">
-                                                <button @click="openViewModal(product)"
-                                                    class="text-cyan-400 hover:text-cyan-300 p-1.5 hover:bg-gray-700 rounded-full transition-colors"
-                                                    title="View Details">
-                                                    <EyeIcon class="w-5 h-5" />
-                                                </button>
-                                                <button @click="openEditModal(product)"
-                                                    class="text-purple-400 hover:text-purple-300 p-1.5 hover:bg-gray-700 rounded-full transition-colors"
-                                                    title="Edit Product">
-                                                    <PencilIcon class="w-5 h-5" />
-                                                </button>
-                                                <button @click="openDeleteModal(product)"
-                                                    class="text-rose-500 hover:text-rose-400 p-1.5 hover:bg-gray-700 rounded-full transition-colors"
-                                                    title="Delete Product">
-                                                    <TrashIcon class="w-5 h-5" />
-                                                </button>
-                                                <button @click="openGRNDocument(product)"
-                                                    class="text-yellow-400 hover:text-yellow-300 p-1.5 hover:bg-gray-700 rounded-full transition-colors"
-                                                    title="Download GRN">
-                                                    <ArrowDownTrayIcon class="w-5 h-5" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                </template>
+                                <tr v-else-if="filteredProducts.length === 0">
+                                    <td colspan="11" class="text-center py-8 text-gray-400">No products available</td>
+                                </tr>
+                                <tr v-else v-for="product in filteredProducts" :key="product.id" class="hover:bg-gray-700/30 transition-colors duration-200">
+                                    <td class="px-6 py-4">{{ product.id }}</td>
+                                    <td class="px-6 py-4">{{ product.name }}</td>
+                                    <td class="px-6 py-4">{{ product.model }}</td>
+                                    <td class="px-6 py-4">${{ Number(product.price).toFixed(2) }}</td>
+                                    <td class="px-6 py-4">{{ product.inventory_id }}</td>
+                                    <td class="px-6 py-4">{{ product.supplier_id }}</td>
+                                    <td class="px-6 py-4">{{ product.quantity }}</td>
+                                    <td class="px-6 py-4">{{ product.restock_date_time }}</td>
+                                    <td class="px-6 py-4">{{ product.added_stock_amount }}</td>
+                                    <td class="px-6 py-4">{{ product.status }}</td>
+                                    <td class="px-6 py-4 text-right">
+                                        <div class="flex items-center justify-end space-x-2">
+                                            <button @click="openViewModal(product)"
+                                                class="text-cyan-400 hover:text-cyan-300 p-1.5 hover:bg-gray-700 rounded-full transition-colors"
+                                                title="View Details">
+                                                <EyeIcon class="w-5 h-5" />
+                                            </button>
+                                            <button @click="openEditModal(product)"
+                                                class="text-purple-400 hover:text-purple-300 p-1.5 hover:bg-gray-700 rounded-full transition-colors"
+                                                title="Edit Product">
+                                                <PencilIcon class="w-5 h-5" />
+                                            </button>
+                                            <button @click="openDeleteModal(product)"
+                                                class="text-rose-500 hover:text-rose-400 p-1.5 hover:bg-gray-700 rounded-full transition-colors"
+                                                title="Delete Product">
+                                                <TrashIcon class="w-5 h-5" />
+                                            </button>
+                                            <button @click="openGRNDocument(product)"
+                                                class="text-yellow-400 hover:text-yellow-300 p-1.5 hover:bg-gray-700 rounded-full transition-colors"
+                                                title="Download GRN">
+                                                <ArrowDownTrayIcon class="w-5 h-5" />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
@@ -1131,7 +1044,7 @@ onUnmounted(() => {
         </div>
 
         <div v-if="showEditModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
-            <div class="bg-gradient-to-b from-gray-800 to-gray-900 rounded-lg w-full max-w-7xl p-8 shadow-xl border border-gray-700/50 max-h-[99vh] min-h-[85vh] overflow-auto" @click.stop>
+            <div class="bg-gradient-to-b from-gray-800 to-gray-900 rounded-lg w-full max-w-2xl p-8 shadow-xl border border-gray-700/50 max-h-[99vh] min-h-[60vh] overflow-auto" @click.stop>
                 <div class="flex justify-between items-center mb-6 border-b border-gray-700/50 pb-4">
                     <div class="flex items-center space-x-2">
                         <PencilIcon class="w-6 h-6 text-purple-400" />
@@ -1142,132 +1055,50 @@ onUnmounted(() => {
                         <XMarkIcon class="w-5 h-5" />
                     </button>
                 </div>
-
                 <form @submit.prevent="handleEditSubmit" class="space-y-8">
-                    <!-- Top Row with increased height -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        <!-- Basic Information -->
-                        <div class="space-y-4">
-                            <h3 class="text-sm font-medium text-gray-300 uppercase mb-3">Basic Information</h3>
-                            <div class="bg-gray-800/50 backdrop-blur-sm p-5 rounded-lg border border-gray-700/30 space-y-4">
-                                <div>
-                                    <span class="text-sm font-medium text-purple-400">Product ID</span>
-                                    <input v-model="editingProduct.id" type="text"
-                                        class="w-full px-4 py-1.5 bg-gray-700/50 rounded-lg border border-gray-600 mt-1 opacity-70"
-                                        disabled>
-                                </div>
-                                <div>
-                                    <span class="text-sm font-medium text-purple-400">Name</span>
-                                    <input v-model="editingProduct.name" type="text"
-                                        class="w-full px-4 py-1.5 bg-gray-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border border-gray-600 mt-1"
-                                        required>
-                                </div>
-                                <div>
-                                    <span class="text-sm font-medium text-purple-400">Description</span>
-                                    <textarea v-model="editingProduct.description"
-                                        class="w-full px-4 py-1.5 bg-gray-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border border-gray-600 mt-1"
-                                        required rows="2"></textarea>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Pricing Information -->
-                        <div class="space-y-4">
-                            <h3 class="text-sm font-medium text-gray-300 uppercase mb-3">Pricing Details</h3>
-                            <div class="bg-gray-800/50 backdrop-blur-sm p-5 rounded-lg border border-gray-700/30 space-y-4">
-                                <div>
-                                    <span class="text-sm font-medium text-purple-400">Price</span>
-                                    <input v-model="editingProduct.price" type="number" step="0.01"
-                                        class="w-full px-4 py-1.5 bg-gray-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border border-gray-600 mt-1"
-                                        required>
-                                </div>
-                                <div>
-                                    <span class="text-sm font-medium text-purple-400">Supplier Price</span>
-                                    <input v-model="editingProduct.seller_price" type="number" step="0.01"
-                                        class="w-full px-4 py-1.5 bg-gray-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border border-gray-600 mt-1">
-                                </div>
-                                <div>
-                                    <span class="text-sm font-medium text-purple-400">Profit</span>
-                                    <input v-model="editingProduct.profit" type="number" step="0.01"
-                                        class="w-full px-4 py-1.5 bg-gray-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border border-gray-600 mt-1"
-                                        required>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Product Specifications -->
-                        <div class="space-y-4">
-                            <h3 class="text-sm font-medium text-gray-300 uppercase mb-3">Product Specifications</h3>
-                            <div class="bg-gray-800/50 backdrop-blur-sm p-5 rounded-lg border border-gray-700/30 space-y-4">
-                                <div>
-                                    <span class="text-sm font-medium text-purple-400">Size & Color</span>
-                                    <div class="grid grid-cols-2 gap-2 mt-1">
-                                        <input v-model="editingProduct.size" type="text" placeholder="Size"
-                                            class="px-4 py-1.5 bg-gray-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border border-gray-600">
-                                        <input v-model="editingProduct.color" type="text" placeholder="Color"
-                                            class="px-4 py-1.5 bg-gray-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border border-gray-600">
-                                    </div>
-                                </div>
-                                <div>
-                                    <span class="text-sm font-medium text-purple-400">Brand Name</span>
-                                    <input v-model="editingProduct.brand_name" type="text"
-                                        class="w-full px-4 py-1.5 bg-gray-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border border-gray-600 mt-1">
-                                </div>
-                                <div>
-                                    <span class="text-sm font-medium text-purple-400">Bar Code</span>
-                                    <input v-model="editingProduct.bar_code" type="text"
-                                        class="w-full px-4 py-1.5 bg-gray-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border border-gray-600 mt-1">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Bottom Row with increased padding -->
                     <div class="space-y-4">
-                        <h3 class="text-sm font-medium text-gray-300 uppercase mb-3">Additional Information</h3>
-                        <div class="bg-gray-800/50 backdrop-blur-sm p-8 rounded-lg border border-gray-700/30">
-                            <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                                <div>
-                                    <span class="text-sm font-medium text-purple-400">Inventory ID</span>
-                                    <input v-model="editingProduct.inventory_id" type="number"
-                                        class="w-full px-4 py-1.5 bg-gray-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border border-gray-600 mt-1">
-                                </div>
-                                <div>
-                                    <span class="text-sm font-medium text-purple-400">Supplier ID</span>
-                                    <input v-model="editingProduct.supplier_id" type="number"
-                                        class="w-full px-4 py-1.5 bg-gray-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border border-gray-600 mt-1">
-                                </div>
-                                <div>
-                                    <span class="text-sm font-medium text-purple-400">Admin ID</span>
-                                    <input v-model="editingProduct.admin_id" type="number"
-                                        class="w-full px-4 py-1.5 bg-gray-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border border-gray-600 mt-1">
-                                </div>
-                                <div>
-                                    <span class="text-sm font-medium text-purple-400">Calculate Length</span>
-                                    <div class="flex items-center mt-3">
-                                        <input v-model="editingProduct.calculate_length" type="checkbox"
-                                            class="w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
-                                    </div>
-                                </div>
-                                <div>
-                                    <span class="text-sm font-medium text-purple-400">Supplier Discount (%)</span>
-                                    <input v-model="editingProduct.discount" type="number" step="0.01"
-                                        class="w-full px-4 py-1.5 bg-gray-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border border-gray-600 mt-1">
-                                </div>
-                                <div>
-                                    <span class="text-sm font-medium text-purple-400">Selling Discount (%)</span>
-                                    <input v-model="editingProduct.selling_discount" type="number" step="0.01"
-                                        class="w-full px-4 py-1.5 bg-gray-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border border-gray-600 mt-1">
-                                </div>
-                                <div>
-                                    <span class="text-sm font-medium text-purple-400">Tax (%)</span>
-                                    <input v-model="editingProduct.tax" type="number" step="0.01"
-                                        class="w-full px-4 py-1.5 bg-gray-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border border-gray-600 mt-1">
-                                </div>
-                            </div>
+                        <div>
+                            <label class="text-sm font-medium text-purple-400">Product ID</label>
+                            <input v-model="editingProduct.id" type="text" class="w-full px-4 py-1.5 bg-gray-700/50 rounded-lg border border-gray-600 mt-1 opacity-70" disabled>
+                        </div>
+                        <div>
+                            <label class="text-sm font-medium text-purple-400">Name</label>
+                            <input v-model="editingProduct.name" type="text" class="w-full px-4 py-1.5 bg-gray-700/50 rounded-lg border border-gray-600 mt-1" required>
+                        </div>
+                        <div>
+                            <label class="text-sm font-medium text-purple-400">Model</label>
+                            <input v-model="editingProduct.model" type="text" class="w-full px-4 py-1.5 bg-gray-700/50 rounded-lg border border-gray-600 mt-1">
+                        </div>
+                        <div>
+                            <label class="text-sm font-medium text-purple-400">Price</label>
+                            <input v-model="editingProduct.price" type="number" step="0.01" class="w-full px-4 py-1.5 bg-gray-700/50 rounded-lg border border-gray-600 mt-1" required>
+                        </div>
+                        <div>
+                            <label class="text-sm font-medium text-purple-400">Inventory ID</label>
+                            <input v-model="editingProduct.inventory_id" type="number" class="w-full px-4 py-1.5 bg-gray-700/50 rounded-lg border border-gray-600 mt-1">
+                        </div>
+                        <div>
+                            <label class="text-sm font-medium text-purple-400">Supplier ID</label>
+                            <input v-model="editingProduct.supplier_id" type="number" class="w-full px-4 py-1.5 bg-gray-700/50 rounded-lg border border-gray-600 mt-1">
+                        </div>
+                        <!-- Inventory fields for reference only -->
+                        <div>
+                            <label class="text-sm font-medium text-purple-400">Quantity</label>
+                            <input v-model="editingProduct.quantity" type="number" class="w-full px-4 py-1.5 bg-gray-700/50 rounded-lg border border-gray-600 mt-1" disabled>
+                        </div>
+                        <div>
+                            <label class="text-sm font-medium text-purple-400">Restock Date</label>
+                            <input v-model="editingProduct.restock_date_time" type="text" class="w-full px-4 py-1.5 bg-gray-700/50 rounded-lg border border-gray-600 mt-1" disabled>
+                        </div>
+                        <div>
+                            <label class="text-sm font-medium text-purple-400">Added Stock Amount</label>
+                            <input v-model="editingProduct.added_stock_amount" type="number" class="w-full px-4 py-1.5 bg-gray-700/50 rounded-lg border border-gray-600 mt-1" disabled>
+                        </div>
+                        <div>
+                            <label class="text-sm font-medium text-purple-400">Status</label>
+                            <input v-model="editingProduct.status" type="text" class="w-full px-4 py-1.5 bg-gray-700/50 rounded-lg border border-gray-600 mt-1" disabled>
                         </div>
                     </div>
-
                     <div class="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-700">
                         <button type="button" @click="showEditModal = false"
                             class="px-4 py-2.5 text-gray-300 hover:text-white bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors duration-200 flex items-center">
@@ -1302,7 +1133,7 @@ onUnmounted(() => {
         </div>
 
         <div v-if="showViewModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
-            <div class="bg-gradient-to-b from-gray-800 to-gray-900 rounded-lg w-full max-w-7xl p-8 shadow-xl border border-gray-700/50 max-h-[99vh] min-h-[85vh] overflow-auto" @click.stop>
+            <div class="bg-gradient-to-b from-gray-800 to-gray-900 rounded-lg w-full max-w-2xl p-8 shadow-xl border border-gray-700/50 max-h-[99vh] min-h-[60vh] overflow-auto" @click.stop>
                 <div class="flex justify-between items-center mb-6 border-b border-gray-700/50 pb-4">
                     <div class="flex items-center space-x-2">
                         <EyeIcon class="w-6 h-6 text-cyan-400" />
@@ -1313,116 +1144,48 @@ onUnmounted(() => {
                         <XMarkIcon class="w-5 h-5" />
                     </button>
                 </div>
-
-                <div class="space-y-8" v-if="viewingProduct">
-                    <!-- Top Row with increased height -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        <!-- Basic Information -->
-                        <div class="space-y-4">
-                            <h3 class="text-sm font-medium text-gray-300 uppercase mb-3">Basic Information</h3>
-                            <div class="bg-gray-800/50 backdrop-blur-sm p-5 rounded-lg border border-gray-700/30 space-y-4 h-[calc(100%-2.5rem)]">
-                                <div>
-                                    <span class="text-sm font-medium text-cyan-400">Product ID</span>
-                                    <p class="text-white font-mono bg-gray-700/50 px-2 py-1 rounded mt-1">{{ viewingProduct.id }}</p>
-                                </div>
-                                <div>
-                                    <span class="text-sm font-medium text-cyan-400">Name</span>
-                                    <p class="text-white mt-1">{{ viewingProduct.name }}</p>
-                                </div>
-                                <div>
-                                    <span class="text-sm font-medium text-cyan-400">Description</span>
-                                    <p class="text-white mt-1">{{ viewingProduct.description }}</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Pricing Information -->
-                        <div class="space-y-4">
-                            <h3 class="text-sm font-medium text-gray-300 uppercase mb-3">Pricing Details</h3>
-                            <div class="bg-gray-800/50 backdrop-blur-sm p-5 rounded-lg border border-gray-700/30 space-y-4 h-[calc(100%-2.5rem)]">
-                                <div>
-                                    <span class="text-sm font-medium text-cyan-400">Price</span>
-                                    <p class="text-white mt-1">${{ Number(viewingProduct.price).toFixed(2) }}</p>
-                                </div>
-                                <div>
-                                    <span class="text-sm font-medium text-cyan-400">Supplier Price</span>
-                                    <p class="text-white mt-1">${{ Number(viewingProduct.seller_price).toFixed(2) }}</p>
-                                </div>
-                                <div>
-                                    <span class="text-sm font-medium text-cyan-400">Profit</span>
-                                    <p class="text-white mt-1">${{ Number(viewingProduct.profit).toFixed(2) }}</p>
-                                </div>
-                                <div>
-                                    <span class="text-sm font-medium text-cyan-400">Discounts & Tax</span>
-                                    <div class="grid grid-cols-2 gap-2 mt-1">
-                                        <p class="text-white">Supplier: {{ Number(viewingProduct.discount).toFixed(2) }}%</p>
-                                        <p class="text-white">Tax: {{ Number(viewingProduct.tax).toFixed(2) }}%</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Product Specifications -->
-                        <div class="space-y-4">
-                            <h3 class="text-sm font-medium text-gray-300 uppercase mb-3">Product Specifications</h3>
-                            <div class="bg-gray-800/50 backdrop-blur-sm p-5 rounded-lg border border-gray-700/30 space-y-4 h-[calc(100%-2.5rem)]">
-                                <div>
-                                    <span class="text-sm font-medium text-cyan-400">Size & Color</span>
-                                    <div class="grid grid-cols-2 gap-2 mt-1">
-                                        <p class="text-white">Size: {{ viewingProduct.size }}</p>
-                                        <p class="text-white">Color: {{ viewingProduct.color }}</p>
-                                    </div>
-                                </div>
-                                <div>
-                                    <span class="text-sm font-medium text-cyan-400">Brand</span>
-                                    <p class="text-white mt-1">
-                                        <span class="px-2 py-1 text-xs rounded-full bg-yellow-500/20 text-yellow-300 border border-yellow-500/30">
-                                            {{ viewingProduct.brand_name }}
-                                        </span>
-                                    </p>
-                                </div>
-                                <div>
-                                    <span class="text-sm font-medium text-cyan-400">Bar Code</span>
-                                    <p class="text-white font-mono bg-gray-700/50 px-2 py-1 rounded mt-1">{{ viewingProduct.bar_code }}</p>
-                                </div>
-                            </div>
-                        </div>
+                <div v-if="viewingProduct" class="space-y-4">
+                    <div>
+                        <label class="text-sm font-medium text-cyan-400">Product ID</label>
+                        <p class="text-white font-mono bg-gray-700/50 px-2 py-1 rounded mt-1">{{ viewingProduct.id }}</p>
                     </div>
-
-                    <!-- Bottom Row with increased padding -->
-                    <div class="space-y-4 mt-4">
-                        <h3 class="text-sm font-medium text-gray-300 uppercase mb-3">System Information</h3>
-                        <div class="bg-gray-800/50 backdrop-blur-sm p-8 rounded-lg border border-gray-700/30">
-                            <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                                <div>
-                                    <span class="text-sm font-medium text-cyan-400">Inventory ID</span>
-                                    <p class="text-white font-mono bg-gray-700/50 px-2 py-1 rounded mt-1">{{ viewingProduct.inventory_id }}</p>
-                                </div>
-                                <div>
-                                    <span class="text-sm font-medium text-cyan-400">Supplier ID</span>
-                                    <p class="text-white font-mono bg-gray-700/50 px-2 py-1 rounded mt-1">{{ viewingProduct.supplier_id }}</p>
-                                </div>
-                                <div>
-                                    <span class="text-sm font-medium text-cyan-400">Admin ID</span>
-                                    <p class="text-white font-mono bg-gray-700/50 px-2 py-1 rounded mt-1">{{ viewingProduct.admin_id }}</p>
-                                </div>
-                                <div>
-                                    <span class="text-sm font-medium text-cyan-400">Calculate Length</span>
-                                    <p class="text-white mt-1">{{ viewingProduct.calculate_length ? 'Yes' : 'No' }}</p>
-                                </div>
-                                <div>
-                                    <span class="text-sm font-medium text-cyan-400">Created At</span>
-                                    <p class="text-white mt-1">{{ new Date(viewingProduct.created_at).toLocaleString() }}</p>
-                                </div>
-                                <div>
-                                    <span class="text-sm font-medium text-cyan-400">Updated At</span>
-                                    <p class="text-white mt-1">{{ new Date(viewingProduct.updated_at).toLocaleString() }}</p>
-                                </div>
-                            </div>
-                        </div>
+                    <div>
+                        <label class="text-sm font-medium text-cyan-400">Name</label>
+                        <p class="text-white mt-1">{{ viewingProduct.name }}</p>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-cyan-400">Model</label>
+                        <p class="text-white mt-1">{{ viewingProduct.model }}</p>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-cyan-400">Price</label>
+                        <p class="text-white mt-1">${{ Number(viewingProduct.price).toFixed(2) }}</p>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-cyan-400">Inventory ID</label>
+                        <p class="text-white font-mono bg-gray-700/50 px-2 py-1 rounded mt-1">{{ viewingProduct.inventory_id }}</p>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-cyan-400">Supplier ID</label>
+                        <p class="text-white font-mono bg-gray-700/50 px-2 py-1 rounded mt-1">{{ viewingProduct.supplier_id }}</p>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-cyan-400">Quantity</label>
+                        <p class="text-white mt-1">{{ viewingProduct.quantity }}</p>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-cyan-400">Restock Date</label>
+                        <p class="text-white mt-1">{{ viewingProduct.restock_date_time }}</p>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-cyan-400">Added Stock Amount</label>
+                        <p class="text-white mt-1">{{ viewingProduct.added_stock_amount }}</p>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-cyan-400">Status</label>
+                        <p class="text-white mt-1">{{ viewingProduct.status }}</p>
                     </div>
                 </div>
-
                 <div class="flex justify-end mt-6 pt-4 border-t border-gray-700">
                     <button @click="showViewModal = false"
                         class="px-4 py-2.5 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors flex items-center">

@@ -17,13 +17,14 @@ class CustomerController extends Controller
     {
         $customers = Customer::with('customerContact')->paginate(10);
 
-        // Map to include contact_number directly for frontend
+        // Map to include contact_number and address for frontend
         $data = array_map(function ($customer) {
             $contact = $customer['customerContact'][0]['contact_number'] ?? '';
             return [
                 'id' => $customer['id'],
                 'name' => $customer['name'],
                 'email' => $customer['email'],
+                'address' => $customer['address'], // <-- Added address
                 'contact' => [['contact_number' => $contact]],
             ];
         }, $customers->items());
@@ -46,6 +47,7 @@ class CustomerController extends Controller
                 'name' => 'required|string|max:255',
                 'email' => 'required|string|email|max:255|unique:customers',
                 'contact_number' => 'required|string|max:20',
+                'address' => 'nullable|string|max:255', // <-- Added address
             ]);
         } catch (ValidationException $th) {
             return response()->json([
@@ -56,7 +58,11 @@ class CustomerController extends Controller
 
         DB::beginTransaction();
         try {
-            $customer = Customer::create(['name' => $validatedAttributes['name'], 'email' => $validatedAttributes['email']]);
+            $customer = Customer::create([
+                'name' => $validatedAttributes['name'],
+                'email' => $validatedAttributes['email'],
+                'address' => $validatedAttributes['address'] ?? null, // <-- Added address
+            ]);
             $contact = Customer_contact::create(['contact_number' => $validatedAttributes['contact_number'], "customer_id" => $customer['id']]);
             DB::commit();
         } catch (\Throwable $th) {
@@ -72,6 +78,7 @@ class CustomerController extends Controller
             'id' => $customer['id'],
             'name' => $customer['name'],
             'email' => $customer['email'],
+            'address' => $customer['address'], // <-- Added address
             'contact' => [['contact_number' => $contact['contact_number']]],
         ]);
     }
@@ -102,6 +109,7 @@ class CustomerController extends Controller
                 'name' => 'required|string|max:255',
                 'email' => ["required", "string", "email", "max:255", Rule::unique('customers')->ignore($id)],
                 'contact_number' => 'required|string|max:20',
+                'address' => 'nullable|string|max:255', // <-- Added address
             ]);
         } catch (ValidationException $th) {
             return response()->json([
@@ -112,7 +120,11 @@ class CustomerController extends Controller
 
         DB::beginTransaction();
         try {
-            $existingCustomer->update(['name' => $validatedAttributes['name'], 'email' => $validatedAttributes['email']]);
+            $existingCustomer->update([
+                'name' => $validatedAttributes['name'],
+                'email' => $validatedAttributes['email'],
+                'address' => $validatedAttributes['address'] ?? null, // <-- Added address
+            ]);
             Customer_contact::where('customer_id', $existingCustomer['id'])->update(['contact_number' => $validatedAttributes['contact_number']]);
             DB::commit();
         } catch (\Throwable $th) {

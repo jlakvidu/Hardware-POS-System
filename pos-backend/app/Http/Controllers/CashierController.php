@@ -19,6 +19,7 @@ class CashierController extends Controller
                 'name' => $cashier->name,
                 'email' => $cashier->email,
                 'password' => $cashier->password,
+                'contact_number' => $cashier->contact_number,
                 'image_url' => $cashier->image_path 
                     ? url('storage/' . $cashier->image_path) 
                     : null
@@ -37,6 +38,7 @@ class CashierController extends Controller
                 'name' => 'required|string',
                 'email' => 'required|string|email',
                 'password' => 'required|string|min:8',
+                'contact_number' => 'required|string',
                 'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
             ]);
 
@@ -57,6 +59,7 @@ class CashierController extends Controller
                 'id' => $createdCashier->id,
                 'name' => $createdCashier->name,
                 'email' => $createdCashier->email,
+                'contact_number' => $createdCashier->contact_number,
                 'image_url' => $createdCashier->image_path 
                     ? url('storage/' . $createdCashier->image_path)
                     : null
@@ -92,7 +95,15 @@ class CashierController extends Controller
         return response()->json([
             'message' => 'Show Cashier Details',
             'id' => $id,
-            'data' => $existingCashier
+            'data' => [
+                'id' => $existingCashier->id,
+                'name' => $existingCashier->name,
+                'email' => $existingCashier->email,
+                'contact_number' => $existingCashier->contact_number,
+                'image_url' => $existingCashier->image_path 
+                    ? url('storage/' . $existingCashier->image_path)
+                    : null
+            ]
         ]);
     }
 
@@ -102,6 +113,7 @@ class CashierController extends Controller
             $validatedAttributes = $request->validate([
                 'name' => 'required|string',
                 'email' => 'required|string|email',
+                'contact_number' => 'required|string',
                 'password' => 'nullable|string|min:8',
             ]);
 

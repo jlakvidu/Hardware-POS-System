@@ -94,27 +94,14 @@ const newItem = ref({
   quantity: 0,
   restock_date_time: getSriLankaDateTime(),
   added_stock_amount: 0,
-  location: '',
   status: 'In Stock',
 });
 
 const newProduct = ref({
   name: '',
+  model: '',
   price: '',
-  seller_price: '',
-  profit: '',
-  discount: 0,
-  selling_discount: 0,
-  tax: '',
-  size: '',
-  color: '',
-  description: '',
-  bar_code: '',
-  brand_name: '',
-  inventory_id: '',
   supplier_id: '',
-  admin_id: '',
-  calculate_length: false,
 });
 
 const categories = ref(['All', 'Warehouse A', 'Warehouse B', 'Warehouse C']);
@@ -189,18 +176,20 @@ const chartOptions = {
 };
 
 const filteredInventory = computed(() => {
+  // Only filter by id and status, since location is not present
   let result = inventory.value;
-  if (selectedCategory.value !== 'All') result = result.filter((item) => item.location === selectedCategory.value);
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase();
-    result = result.filter((item) => item.location?.toLowerCase().includes(query) || item.status?.toLowerCase().includes(query) || item.id?.toString().includes(query));
+    result = result.filter((item) =>
+      item.status?.toLowerCase().includes(query) ||
+      item.id?.toString().includes(query)
+    );
   }
   return [...result].sort((a, b) => {
     let comparison = 0;
     switch (sortBy.value) {
       case 'quantity': comparison = a.quantity - b.quantity; break;
       case 'added_stock_amount': comparison = (a.added_stock_amount || 0) - (b.added_stock_amount || 0); break;
-      case 'location': comparison = a.location.localeCompare(b.location); break;
       case 'status': comparison = a.status.localeCompare(b.status); break;
       case 'lastUpdated': comparison = new Date(a.restock_date_time) - new Date(b.restock_date_time); break;
     }
@@ -289,16 +278,19 @@ const fetchInventory = async () => {
     const response = await connection.get('/inventory');
     if (!response.data) throw new Error('No data received from server');
     inventory.value = response.data.map((item) => ({
-      ...item,
-      product: {
-        ...item.product,
-        price: parseFloat(item.product?.price || 0),
-        seller_price: parseFloat(item.product?.seller_price || 0),
-        discount: parseFloat(item.product?.discount || 0),
-        selling_discount: parseFloat(item.product?.selling_discount || 0),
-      },
-      calculate_length: item.product?.calculate_length || false,
-      size: item.product?.size || 1,
+      id: item.id,
+      quantity: item.quantity,
+      status: item.status,
+      restock_date_time: item.restock_date_time,
+      added_stock_amount: item.added_stock_amount,
+      product: item.product ? {
+        id: item.product.id,
+        name: item.product.name,
+        model: item.product.model,
+        price: item.product.price,
+        supplier_id: item.product.supplier_id,
+        inventory_id: item.product.inventory_id,
+      } : null,
     }));
   } catch (error) {
     console.error('Error fetching inventory:', error);
@@ -314,12 +306,12 @@ const router = useRouter();
 
 const openAddModal = () => {
   currentStep.value = 1;
-  newItem.value = { quantity: 0, restock_date_time: getSriLankaDateTime(), added_stock_amount: 0, location: locations.value[0] || '', status: statusOptions.value[0] || 'In Stock' };
+  newItem.value = { quantity: 0, restock_date_time: getSriLankaDateTime(), added_stock_amount: 0, status: statusOptions.value[0] || 'In Stock' };
   showMultiStepModal.value = true;
 };
 
 const saveNewItem = async () => {
-  if (!newItem.value.quantity || !newItem.value.location) {
+  if (!newItem.value.quantity /*|| !newItem.value.location*/) {
     showNotification('Please fill in all required fields', 'error');
     return;
   }
@@ -329,7 +321,7 @@ const saveNewItem = async () => {
       quantity: parseInt(newItem.value.quantity) || 0,
       restock_date_time: newItem.value.restock_date_time || getSriLankaDateTime(),
       added_stock_amount: parseInt(newItem.value.added_stock_amount) || 0,
-      location: newItem.value.location || '',
+      // location: newItem.value.location || '', // Removed
       status: newItem.value.status || 'In Stock',
     };
     const response = await connection.post('/inventory', payload);
@@ -352,33 +344,20 @@ const grnNumber = ref('');
 
 const saveNewProduct = async () => {
   try {
-    if (!newProduct.value.name || !newProduct.value.price || !newProduct.value.seller_price || !newProduct.value.description) {
-      showNotification('Please fill in all required fields (Name, Price, Seller Price, Description)', 'error');
+    if (!newProduct.value.name || !newProduct.value.model || !newProduct.value.price || !newProduct.value.supplier_id) {
+      showNotification('Please fill in all required fields (Name, Model, Price, Supplier ID)', 'error');
       return;
     }
-
-    if (!newlyAddedInventoryId.value || !newProduct.value.supplier_id || !newProduct.value.admin_id) {
-      showNotification('Inventory ID, Supplier ID, and Admin ID are required', 'error');
+    if (!newlyAddedInventoryId.value) {
+      showNotification('Inventory ID is required', 'error');
       return;
     }
-
     const payload = {
       name: newProduct.value.name.trim(),
+      model: newProduct.value.model.trim(),
       price: parseFloat(newProduct.value.price) || 0,
-      seller_price: parseFloat(newProduct.value.seller_price) || 0,
-      profit: newProduct.value.profit ? parseFloat(newProduct.value.profit) : null,
-      discount: newProduct.value.discount ? parseFloat(newProduct.value.discount) : 0,
-      selling_discount: newProduct.value.selling_discount ? parseFloat(newProduct.value.selling_discount) : 0,
-      tax: newProduct.value.tax ? parseFloat(newProduct.value.tax) : 0,
-      size: newProduct.value.size || null,
-      color: newProduct.value.color || null,
-      description: newProduct.value.description.trim(),
-      bar_code: newProduct.value.bar_code || null,
-      brand_name: newProduct.value.brand_name || null,
-      inventory_id: parseInt(newlyAddedInventoryId.value),
       supplier_id: parseInt(newProduct.value.supplier_id),
-      admin_id: parseInt(newProduct.value.admin_id),
-      calculate_length: !!newProduct.value.calculate_length,
+      inventory_id: newlyAddedInventoryId.value, // <-- Add this line
     };
 
     const response = await connection.post('/products', payload);
@@ -432,21 +411,9 @@ const saveNewProduct = async () => {
     currentStep.value = 1;
     newProduct.value = {
       name: '',
+      model: '',
       price: '',
-      seller_price: '',
-      profit: '',
-      discount: 0,
-      selling_discount: 0,
-      tax: '',
-      size: '',
-      color: '',
-      description: '',
-      bar_code: '',
-      brand_name: '',
-      inventory_id: '',
       supplier_id: '',
-      admin_id: '',
-      calculate_length: false
     };
     fetchInventory();
   } catch (error) {
@@ -497,6 +464,9 @@ const isUpdatingStock = ref(false);
 const showGRN = ref(false);
 const grnProduct = ref(null);
 
+const previousStock = ref(0)
+const newStock = ref(0)
+
 const confirmStockAdjustment = async () => {
   if (!selectedItem.value || stockAdjustment.value.quantity === 0) {
     Swal.fire({ icon: 'error', title: 'Error!', text: 'Please enter a valid quantity', background: '#1e293b', color: '#ffffff' });
@@ -508,21 +478,31 @@ const confirmStockAdjustment = async () => {
   }
   try {
     isUpdatingStock.value = true;
+    previousStock.value = selectedItem.value.quantity;
     const newQuantity = Math.max(0, selectedItem.value.quantity + stockAdjustment.value.quantity);
+    newStock.value = newQuantity;
     const updatedItem = {
-      ...selectedItem.value,
       quantity: newQuantity,
       restock_date_time: stockAdjustment.value.restock_date_time,
       added_stock_amount: stockAdjustment.value.quantity > 0 ? stockAdjustment.value.quantity : 0,
-      location: selectedItem.value.location,
       status: determineStatus(newQuantity),
-      product: { ...selectedItem.value.product, calculate_length: selectedItem.value.product?.calculate_length || false, size: selectedItem.value.product?.size || 1 },
     };
     const response = await connection.put(`/inventory/${selectedItem.value.id}`, updatedItem);
     const index = inventory.value.findIndex((item) => item.id === selectedItem.value.id);
     if (index !== -1) {
-      inventory.value[index] = response.data;
-      addStockHistory(selectedItem.value.id, stockAdjustment.value.quantity, stockAdjustment.value.quantity < 0 ? 'Stock Removal' : 'Stock Addition', stockAdjustment.value.quantity < 0 ? 'Manual stock reduction' : 'Manual stock addition', selectedItem.value.quantity, newQuantity);
+      // Merge updated fields into the existing item to keep reactivity
+      inventory.value[index] = {
+        ...inventory.value[index],
+        ...response.data
+      };
+      addStockHistory(
+        selectedItem.value.id,
+        stockAdjustment.value.quantity,
+        stockAdjustment.value.quantity < 0 ? 'Stock Removal' : 'Stock Addition',
+        stockAdjustment.value.quantity < 0 ? 'Manual stock reduction' : 'Manual stock addition',
+        selectedItem.value.quantity,
+        newQuantity
+      );
     }
     if (stockAdjustment.value.quantity > 0) {
       const timestamp = Date.now();
@@ -811,8 +791,7 @@ const viewItemDetails = async (item) => {
 
 const handleGRNClose = () => {
   showGRN.value = false;
-  // Update inventory locally instead of refreshing the page
-  fetchInventory();
+  // No fetchInventory() here; inventory is already updated in confirmStockAdjustment
 };
 
 // Add form components
@@ -907,11 +886,6 @@ const FormLabel = {
                       <component :is="getSortIcon('quantity')" v-if="getSortIcon('quantity')" class="h-4 w-4" />
                     </div>
                   </th>
-                  <th @click="toggleSort('location')" class="text-left cursor-pointer font-medium pb-4">
-                    <div class="flex gap-1 items-center">Location
-                      <component :is="getSortIcon('location')" v-if="getSortIcon('location')" class="h-4 w-4" />
-                    </div>
-                  </th>
                   <th @click="toggleSort('status')" class="text-left cursor-pointer font-medium pb-4">
                     <div class="flex gap-1 items-center">Status
                       <component :is="getSortIcon('status')" v-if="getSortIcon('status')" class="h-4 w-4" />
@@ -930,17 +904,12 @@ const FormLabel = {
                   class="border-gray-700/50 border-t duration-200 hover:bg-gray-700/30 transition-colors"
                   :class="{ 'bg-red-900/20': item.status === 'Low Stock' || item.status === 'Out Of Stock' }">
                   <td class="font-medium py-4">{{ item.id }}</td>
-                  <td><span
-                      :class="{ 'text-red-400': item.status === 'Low Stock' || item.status === 'Out Of Stock', 'font-bold': true }">{{
-                      item.quantity }} <span
-                        v-if="item.product?.calculate_length && item.product?.size !== undefined">({{
-                          item.quantity * (item.product.size || 1) }})</span></span></td>
-                  <td class="text-gray-300"><span class="bg-gray-700/50 rounded-full text-xs px-2 py-1">{{ item.location
-                      }}</span>
+                  <td>{{ item.quantity }}</td>
+                  <td>
+                    <span :class="{ 'px-2 py-1 rounded-full text-xs': true, 'bg-emerald-500/20 text-emerald-400': item.status === 'In Stock', 'bg-yellow-500/20 text-yellow-400': item.status === 'Low Stock', 'bg-red-500/20 text-red-400': item.status === 'Out Of Stock' }">
+                      {{ item.status }}
+                    </span>
                   </td>
-                  <td><span
-                      :class="{ 'px-2 py-1 rounded-full text-xs': true, 'bg-emerald-500/20 text-emerald-400': item.status === 'In Stock', 'bg-yellow-500/20 text-yellow-400': item.status === 'Low Stock', 'bg-red-500/20 text-red-400': item.status === 'Out Of Stock' }">{{
-                      item.status }}</span></td>
                   <td class="text-gray-300 text-sm">{{ new Date(item.restock_date_time).toLocaleString() }}</td>
                   <td>
                     <div class="flex gap-2">
@@ -1193,8 +1162,16 @@ const FormLabel = {
       </div>
     </div>
 
-    <StockUpdateGRN v-if="showGRN" :stockData="selectedItem" :grnNumber="grnNumber" :showModal="showGRN"
-      :adjustmentQuantity="stockAdjustment.quantity" @close="handleGRNClose" />
+    <StockUpdateGRN
+      v-if="showGRN"
+      :stockData="selectedItem"
+      :grnNumber="grnNumber"
+      :showModal="showGRN"
+      :adjustmentQuantity="stockAdjustment.quantity"
+      :previousStock="previousStock"
+      :newStock="newStock"
+      @close="handleGRNClose"
+    />
 
     <GRNDocument
       v-if="showGRNDocument"
@@ -1310,7 +1287,7 @@ const FormLabel = {
               fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824  3 7.938l3-2.647z">
               </path>
             </svg>
             <p class="text-white font-medium">Generating Report...</p>
@@ -1324,7 +1301,7 @@ const FormLabel = {
     <div v-if="showViewModal" class="flex bg-black/80 justify-center p-4 backdrop-blur-sm fixed inset-0 items-center z-50">
       <div class="bg-gradient-to-br border border-gray-700/50 p-6 rounded-2xl shadow-2xl w-full animate-fade-in from-gray-900/95 max-w-2xl to-gray-800/95">
         <!-- Enhanced Header -->
-        <div class="flex justify-between items-start mb-8">
+               <div class="flex justify-between items-start mb-8">
           <div class="flex gap-4 items-center">
             <div class="bg-gradient-to-br border border-blue-500/20 p-3 rounded-xl shadow-lg from-blue-600/10 to-blue-700/10">
               <EyeIcon class="h-6 text-blue-400 w-6" />
@@ -1366,6 +1343,14 @@ const FormLabel = {
                 }"></span>
                 {{ selectedItem.status }}
               </span>
+            </div>
+            <div class="grid grid-cols-2 gap-6">
+              <div><span class="text-gray-400 text-sm">Current Stock</span>
+                <div class="text-3xl text-white font-bold mt-1">{{ selectedItem.quantity }}</div>
+              </div>
+              <div class="text-right"><span class="text-gray-400 text-sm">Location</span>
+                <div class="text-lg text-white font-medium mt-1">{{ selectedItem.location }}</div>
+              </div>
             </div>
           </div>
 
@@ -1499,12 +1484,7 @@ const FormLabel = {
                       <FormLabel>Added Stock Amount</FormLabel>
                       <input v-model="newItem.added_stock_amount" type="number" class="form-input" />
                     </FormField>
-                    <FormField>
-                      <FormLabel>Location</FormLabel>
-                      <select v-model="newItem.location" class="form-input">
-                        <option v-for="loc in locations" :key="loc" :value="loc">{{ loc }}</option>
-                      </select>
-                    </FormField>
+                    <!-- Location field removed -->
                   </div>
                   <div class="flex justify-end space-x-3 mt-6">
                     <button @click="showMultiStepModal = false" class="btn-secondary">Cancel</button>
@@ -1515,62 +1495,22 @@ const FormLabel = {
                 </div>
 
                 <div v-if="currentStep === 2" class="space-y-6">
-                  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField>
                       <FormLabel>Product Name</FormLabel>
                       <input v-model="newProduct.name" type="text" class="form-input" required />
+                    </FormField>
+                    <FormField>
+                      <FormLabel>Model</FormLabel>
+                      <input v-model="newProduct.model" type="text" class="form-input" required />
                     </FormField>
                     <FormField>
                       <FormLabel>Price</FormLabel>
                       <input v-model="newProduct.price" type="number" step="0.01" class="form-input" required />
                     </FormField>
                     <FormField>
-                      <FormLabel>Seller Price</FormLabel>
-                      <input v-model="newProduct.seller_price" type="number" step="0.01" class="form-input" required />
-                    </FormField>
-                    <FormField>
-                      <FormLabel>Supplier Discount</FormLabel>
-                      <input v-model="newProduct.discount" type="number" step="0.01" class="form-input" />
-                    </FormField>
-                    <FormField>
-                      <FormLabel>Selling Discount</FormLabel>
-                      <input v-model="newProduct.selling_discount" type="number" step="0.01" class="form-input" />
-                    </FormField>
-                    <FormField>
-                      <FormLabel>Tax</FormLabel>
-                      <input v-model="newProduct.tax" type="number" step="0.01" class="form-input" />
-                    </FormField>
-                    <FormField>
-                      <FormLabel>Calculate Length</FormLabel>
-                      <input v-model="newProduct.calculate_length" type="checkbox" class="form-input h-10" />
-                    </FormField>
-                    <FormField class="md:col-span-2">
-                      <FormLabel>Description</FormLabel>
-                      <textarea v-model="newProduct.description" class="form-input" required rows="2"></textarea>
-                    </FormField>
-                    <FormField>
                       <FormLabel>Supplier ID</FormLabel>
                       <input v-model="newProduct.supplier_id" type="number" class="form-input" required />
-                    </FormField>
-                    <FormField>
-                      <FormLabel>Admin ID</FormLabel>
-                      <input v-model="newProduct.admin_id" type="number" class="form-input" required />
-                    </FormField>
-                    <FormField>
-                      <FormLabel>Brand Name</FormLabel>
-                      <input v-model="newProduct.brand_name" type="text" class="form-input" required />
-                    </FormField>
-                    <FormField>
-                      <FormLabel>Size</FormLabel>
-                      <input v-model="newProduct.size" type="text" class="form-input" required />
-                    </FormField>
-                    <FormField>
-                      <FormLabel>Color</FormLabel>
-                      <input v-model="newProduct.color" type="text" class="form-input" required />
-                    </FormField>
-                    <FormField>
-                      <FormLabel>Bar Code</FormLabel>
-                      <input v-model="newProduct.bar_code" type="text" class="form-input"  />
                     </FormField>
                   </div>
                   <div class="flex justify-end space-x-3 mt-6">

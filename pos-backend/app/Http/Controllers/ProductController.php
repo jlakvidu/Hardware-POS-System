@@ -17,11 +17,7 @@ class ProductController extends Controller
     public function index(): JsonResponse
     {
         try {
-            $products = Product::with('inventory', 'admin')->get()->map(function ($product) {
-                $product->calculate_length = $product->calculate_length; 
-                $product->size = $product->size;
-                return $product;
-            });
+            $products = Product::with('inventory', 'supplier')->get();
             return $this->successResponse('Product retrieved successfully', $products);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
@@ -30,10 +26,7 @@ class ProductController extends Controller
     public function show(string $id): JsonResponse
     {
         try {
-            $product = Product::with('inventory')->findOrFail($id);
-            $product->quantity = $product->calculate_length && $product->inventory
-                ? $product->size * $product->inventory->quantity
-                : $product->inventory->quantity; 
+            $product = Product::with('inventory', 'supplier')->findOrFail($id);
             return $this->successResponse('Product retrieved successfully', $product);
         } catch (Exception $e) {
             return $this->errorResponse('Product not found', 404);
@@ -46,69 +39,27 @@ class ProductController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'name' => 'required|string|max:255',
-                'supplier_id' => 'required|exists:suppliers,id',
-                'seller_price' => 'required|numeric|min:0',
-                'discount' => 'required|numeric|min:0', 
-                'selling_discount' => 'sometimes|numeric|min:0', 
+                'model' => 'required|string|max:255',
                 'price' => 'required|numeric|min:0',
-                'brand_name' => 'required|string|max:255',
-                'tax' => 'required|numeric|min:0',
-                'size' => 'required|string',
-                'color' => 'required|string',
-                'description' => 'required|string',
-                'bar_code' => 'unique:products',
+                'supplier_id' => 'required|exists:suppliers,id',
                 'inventory_id' => 'required|exists:inventories,id',
-                'admin_id' => 'required|exists:admins,id',
-                'calculate_length' => 'sometimes|boolean', 
             ]);
 
             if ($validator->fails()) {
                 return $this->errorResponse($validator->errors(), 422);
             }
 
-            $inventory = Inventory::find($request->inventory_id);
-            if (!$inventory) {
-                return $this->errorResponse('Invalid inventory ID. Please enter a valid inventory ID.', 404);
-            }
-
-            if (Product::where('bar_code', $request->bar_code)->exists()) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'A product with this bar code already exists'
-                ], 409);
-            }
-
             DB::beginTransaction();
 
-            $profit = $request->price - $request->seller_price;
-
-            $product = Product::create([
+            $product = \App\Models\Product::create([
                 'name' => $request->name,
+                'model' => $request->model,
                 'price' => $request->price,
-                'seller_price' => $request->seller_price,
-                'profit' => $profit,
-                'discount' => $request->discount ?? 0, 
-                'selling_discount' => $request->selling_discount ?? 0, 
-                'tax' => $request->tax,
-                'size' => $request->size,
-                'color' => $request->color,
-                'description' => $request->description,
-                'bar_code' => $request->bar_code,
-                'brand_name' => $request->brand_name,
-                'inventory_id' => $request->inventory_id,
                 'supplier_id' => $request->supplier_id,
-                'admin_id' => $request->admin_id,
-                'calculate_length' => $request->calculate_length ?? false, 
-            ]);
-
-            SupplierProduct::create([
-                'product_id' => $product->id,
-                'supplier_id' => $request->supplier_id
+                'inventory_id' => $request->inventory_id,
             ]);
 
             DB::commit();
-
-            $product->load('inventory');
 
             return $this->successResponse('Product created successfully', $product, 201);
 

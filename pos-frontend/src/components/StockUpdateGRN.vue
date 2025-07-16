@@ -19,6 +19,16 @@ const props = defineProps({
   adjustmentQuantity: {
     type: Number,
     required: true
+  },
+  previousStock: {
+    type: Number,
+    required: false,
+    default: null
+  },
+  newStock: {
+    type: Number,
+    required: false,
+    default: null
   }
 })
 
@@ -97,7 +107,7 @@ const currentTime = formatTime()
               <BuildingLibraryIcon class="w-10 h-10 text-white" />
             </div>
             <div>
-              <h1 class="text-2xl font-bold text-gray-800">HARDWARE ENTERPRISE</h1>
+              <h1 class="text-2xl font-bold text-gray-800">Weads Horana Pvt Ltd</h1>
               <p class="text-gray-500">Stock Adjustment Receipt</p>
             </div>
           </div>
@@ -118,16 +128,12 @@ const currentTime = formatTime()
               <p class="text-lg font-semibold">#{{ stockData.id }}</p>
             </div>
             <div>
-              <p class="text-gray-600 mb-1">Location</p>
-              <p class="text-lg font-semibold">{{ stockData.location }}</p>
-            </div>
-            <div>
               <p class="text-gray-600 mb-1">Previous Stock</p>
-              <p class="text-lg font-semibold">{{ stockData.quantity - adjustmentQuantity }}</p>
+              <p class="text-lg font-semibold">{{ previousStock !== null ? previousStock : (stockData.quantity - adjustmentQuantity) }}</p>
             </div>
             <div>
               <p class="text-gray-600 mb-1">New Stock</p>
-              <p class="text-lg font-semibold">{{ stockData.quantity }}</p>
+              <p class="text-lg font-semibold">{{ newStock !== null ? newStock : stockData.quantity }}</p>
             </div>
             <div>
               <p class="text-gray-600 mb-1">Adjustment Amount</p>

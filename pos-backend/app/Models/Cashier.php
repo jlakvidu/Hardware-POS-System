@@ -15,7 +15,8 @@ class Cashier extends Model
         'name',
         'email',
         'password',
-        'image_path'
+        'image_path',
+        'contact_number'
     ];
 
     protected $hidden = ['password'];

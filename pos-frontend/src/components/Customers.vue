@@ -40,7 +40,8 @@ const showViewModal = ref(false)
 const newCustomer = ref({
     name: '',
     email: '',
-    contact_number: ''
+    contact_number: '',
+    address: '' // <-- Added address
 })
 
 const editingCustomer = ref({})
@@ -58,7 +59,8 @@ const fetchCustomers = async () => {
             id: customer.id,
             name: customer.name,
             email: customer.email,
-            contact: customer.contact // already [{ contact_number: ... }]
+            address: customer.address, // <-- Ensure address is loaded
+            contact: customer.contact
         }))
     } catch (error) {
         console.error('Error fetching customers:', error)
@@ -89,7 +91,8 @@ const handleAddCustomer = async () => {
         const response = await connection.post('/customers', {
             name: newCustomer.value.name,
             email: newCustomer.value.email,
-            contact_number: newCustomer.value.contact_number
+            contact_number: newCustomer.value.contact_number,
+            address: newCustomer.value.address // <-- Added address
         })
 
         // Use backend response for new customer structure
@@ -97,12 +100,13 @@ const handleAddCustomer = async () => {
             id: response.data.id,
             name: response.data.name,
             email: response.data.email,
+            address: response.data.address, // <-- Added address
             contact: response.data.contact
         }
         customers.value.push(newCustomerData)
 
         showModal.value = false
-        newCustomer.value = { name: '', email: '', contact_number: '' }
+        newCustomer.value = { name: '', email: '', contact_number: '', address: '' } // <-- Reset address
 
         Swal.fire({
             position: "center",
@@ -139,7 +143,8 @@ const handleEditCustomer = async () => {
         await connection.put(`/customers/${editingCustomer.value.id}`, {
             name: editingCustomer.value.name,
             email: editingCustomer.value.email,
-            contact_number: editingCustomer.value.contact[0].contact_number
+            contact_number: editingCustomer.value.contact[0].contact_number,
+            address: editingCustomer.value.address // <-- Added address
         })
 
         const index = customers.value.findIndex(c => c.id === editingCustomer.value.id)
@@ -284,7 +289,8 @@ const filteredCustomers = computed(() => {
 const formErrors = ref({
     name: '',
     email: '',
-    contact_number: ''
+    contact_number: '',
+    address: '' // <-- Added address
 })
 
 const validateInput = (field, value) => {
@@ -318,6 +324,13 @@ const validateInput = (field, value) => {
                 formErrors.value.email = ''
             }
             break
+        case 'address':
+            if (value && value.length > 255) {
+                formErrors.value.address = 'Address must be less than 255 characters'
+            } else {
+                formErrors.value.address = ''
+            }
+            break
     }
 }
 
@@ -327,7 +340,8 @@ const isValidNewCustomer = computed(() => {
 
     return newCustomer.value.name.trim() !== '' &&
            phoneRegex.test(newCustomer.value.contact_number.trim()) &&
-           emailRegex.test(newCustomer.value.email.trim())
+           emailRegex.test(newCustomer.value.email.trim()) &&
+           (newCustomer.value.address.length <= 255)
 })
 
 const isValidEditCustomer = computed(() => {
@@ -336,7 +350,8 @@ const isValidEditCustomer = computed(() => {
 
     return editingCustomer.value.name?.trim() !== '' &&
            phoneRegex.test(editingCustomer.value.contact?.[0]?.contact_number?.trim()) &&
-           emailRegex.test(editingCustomer.value.email?.trim())
+           emailRegex.test(editingCustomer.value.email?.trim()) &&
+           (editingCustomer.value.address?.length <= 255)
 })
 
 </script>
@@ -399,6 +414,9 @@ const isValidEditCustomer = computed(() => {
                                             <th class="w-1/6 px-6 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                                                 Contact Number
                                             </th>
+                                            <th class="w-1/6 px-6 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                                                Address
+                                            </th>
                                             <th class="w-1/6 px-6 py-4 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
                                                 Actions
                                             </th>
@@ -406,7 +424,7 @@ const isValidEditCustomer = computed(() => {
                                     </thead>
                                     <tbody class="divide-y divide-gray-700">
                                         <tr v-if="isLoading" class="hover:bg-gray-700">
-                                            <td colspan="5" class="h-[400px] relative">
+                                            <td colspan="6" class="h-[400px] relative">
                                                 <div class="absolute inset-0 flex flex-col items-center justify-center space-y-4">
                                                     <div class="loader-container">
                                                         <div class="loader">
@@ -429,12 +447,12 @@ const isValidEditCustomer = computed(() => {
                                             </td>
                                         </tr>
                                         <tr v-else-if="customers.length === 0" class="hover:bg-gray-700">
-                                            <td colspan="5" class="px-6 py-8 text-center text-gray-400">
+                                            <td colspan="6" class="px-6 py-8 text-center text-gray-400">
                                                 No customers found
                                             </td>
                                         </tr>
                                         <tr v-else-if="filteredCustomers.length === 0" class="hover:bg-gray-700">
-                                            <td colspan="5" class="px-6 py-8 text-center text-gray-400">
+                                            <td colspan="6" class="px-6 py-8 text-center text-gray-400">
                                                 <div class="flex flex-col items-center justify-center space-y-2">
                                                     <MagnifyingGlassIcon class="w-6 h-6 text-gray-500" />
                                                     <span>No results found for "{{ searchQuery }}"</span>
@@ -462,6 +480,12 @@ const isValidEditCustomer = computed(() => {
                                                     <div class="flex items-center">
                                                         <PhoneIcon class="w-4 h-4 text-gray-400 mr-2" />
                                                         {{ customer.contact[0].contact_number }}
+                                                    </div>
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                                                    <div class="flex items-center">
+                                                        <BuildingOfficeIcon class="w-4 h-4 text-gray-400 mr-2" />
+                                                        {{ customer.address || 'N/A' }}
                                                     </div>
                                                 </td>
                                                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
@@ -523,6 +547,19 @@ const isValidEditCustomer = computed(() => {
                                             placeholder="Enter customer name" 
                                             required>
                                         <p v-if="formErrors.name" class="mt-1 text-sm text-red-500">{{ formErrors.name }}</p>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-300 mb-1">Address</label>
+                                        <input v-model="newCustomer.address"
+                                            @input="validateInput('address', newCustomer.address)"
+                                            type="text"
+                                            class="w-full px-4 py-2.5 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border"
+                                            :class="[
+                                                formErrors.address ? 'border-red-500' : 'border-gray-600',
+                                                !formErrors.address && newCustomer.address ? 'border-blue-500' : ''
+                                            ]"
+                                            placeholder="Enter address (optional)">
+                                        <p v-if="formErrors.address" class="mt-1 text-sm text-red-500">{{ formErrors.address }}</p>
                                     </div>
                                 </div>
 
@@ -643,6 +680,19 @@ const isValidEditCustomer = computed(() => {
                                             placeholder="Enter customer name" 
                                             required>
                                         <p v-if="formErrors.name" class="mt-1 text-sm text-red-500">{{ formErrors.name }}</p>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-300 mb-1">Address</label>
+                                        <input v-model="editingCustomer.address"
+                                            @input="validateInput('address', editingCustomer.address)"
+                                            type="text"
+                                            class="w-full px-4 py-2.5 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border"
+                                            :class="[
+                                                formErrors.address ? 'border-red-500' : 'border-gray-600',
+                                                !formErrors.address && editingCustomer.address ? 'border-purple-500' : ''
+                                            ]"
+                                            placeholder="Enter address (optional)">
+                                        <p v-if="formErrors.address" class="mt-1 text-sm text-red-500">{{ formErrors.address }}</p>
                                     </div>
                                 </div>
 
@@ -772,6 +822,14 @@ const isValidEditCustomer = computed(() => {
                                 <p class="text-white flex items-center">
                                     <PhoneIcon class="w-5 h-5 text-gray-400 mr-2" />
                                     {{ viewingCustomer.contact[0].contact_number }}
+                                </p>
+                            </div>
+
+                            <div class="bg-gray-800/50 backdrop-blur-sm p-4 rounded-lg border border-gray-700/30 hover:border-blue-500/50 transition-colors duration-300">
+                                <h3 class="text-sm font-medium text-blue-400 uppercase mb-2">Address</h3>
+                                <p class="text-white flex items-center">
+                                    <BuildingOfficeIcon class="w-5 h-5 text-gray-400 mr-2" />
+                                    {{ viewingCustomer.address || 'N/A' }}
                                 </p>
                             </div>
                         </div>

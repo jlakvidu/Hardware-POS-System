@@ -118,10 +118,9 @@ const clearHoveredSection = () => {
           </div>
           <div class="flex flex-col">
             <span class="text-xl font-bold text-white">
-              Hardware
-              <span class="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-cyan-400 font-extrabold">POS</span>
+              Weads
+              <span class="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-cyan-400 font-extrabold">Horana</span>
             </span>
-            <span class="text-xs text-gray-400">Inventory Management</span>
           </div>
         </div>
         <button @click="emit('closeSidebar')" 

@@ -131,18 +131,19 @@ const error = ref(null)
 const fetchProducts = async () => {
   try {
     loading.value = true
+    // Fetch products from backend (only fields: id, name, model, price, supplier_id, inventory_id)
     const response = await connection.get('/products')
-    const productsWithInventory = await Promise.all(
-      response.data.data.map(async (product) => {
-        const inventoryResponse = await connection.get(`/inventory/${product.inventory_id}`)
-        return {
-          ...product,
-          price: product.price, // Adjust price after selling discount
-          stock: inventoryResponse.data.quantity
-        }
-      })
-    )
-    products.value = productsWithInventory
+    // The backend returns { data: [...] }
+    products.value = response.data.data.map(product => ({
+      id: product.id,
+      name: product.name,
+      model: product.model,
+      price: product.price,
+      supplier_id: product.supplier_id,
+      inventory_id: product.inventory_id,
+      // Optionally, fetch inventory quantity for stock
+      stock: product.inventory?.quantity ?? 0
+    }))
   } catch (err) {
     error.value = 'Failed to fetch products'
     console.error('Error fetching products:', err)
@@ -157,7 +158,8 @@ const filteredProducts = computed(() => {
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
     result = result.filter(product =>
-      product.name.toLowerCase().includes(query)
+      product.name.toLowerCase().includes(query) ||
+      product.model?.toLowerCase().includes(query)
     )
   }
   return result
@@ -907,19 +909,14 @@ watch(() => total.value, (newTotal) => {
                   
                   <!-- Product Name -->
                   <div class="font-medium text-white text-lg mb-2">{{ product.name }}</div>
-                  <div class="text-sm text-gray-400 mb-3">{{ product.brand_name }}</div>
-                  <div class="text-sm text-gray-400 mb-3">Size: {{ product.size }}</div>
-                  <div class="text-sm text-gray-400 mb-3">{{ product.description }}</div> <!-- Add this line -->
-                  <!-- Divider -->
+                  <div class="text-sm text-gray-400 mb-3">Model: {{ product.model }}</div>
+                  <!-- Only show price and stock -->
                   <div class="h-px bg-gradient-to-r from-transparent via-gray-700 to-transparent my-3"></div>
-                  
-                  <!-- Price and Add Button -->
                   <div class="flex justify-between items-center">
                     <div>
                       <div class="text-xs text-gray-400 mb-1">Price</div>
                       <div class="text-blue-400 font-bold text-lg">Rs. {{ Number(product.price).toLocaleString() }}</div> <!-- Display adjusted price -->
                     </div>
-                    
                     <button :class="[
                       'p-2 rounded-lg transition-colors duration-200 text-white flex items-center gap-2',
                       product.stock === 0 ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'
@@ -1365,7 +1362,7 @@ watch(() => total.value, (newTotal) => {
           <div class="border-b-2 border-gray-300 pb-8">
             <div class="flex justify-between items-start">
               <div>
-                <div class="text-3xl font-bold text-blue-600">HARDWARE SUPPLY</div>
+                <div class="text-3xl font-bold text-blue-600">Weads Horana Pvt Ltd</div>
                 <div class="text-sm text-gray-600 mt-2">
                   102 Railway Ave.<br>
                   Kandy, Sri Lanka<br>

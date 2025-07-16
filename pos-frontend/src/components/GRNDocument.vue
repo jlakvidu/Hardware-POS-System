@@ -93,50 +93,25 @@ const supplierInfo = computed(() => ({
 
 // Add computed properties for product details
 const productDetails = computed(() => ({
+  id: props.productData?.id || 'N/A',
   name: props.productData?.name || 'N/A',
-  description: props.productData?.description || 'N/A',
-  quantity: Number(props.productData?.quantity) || 0,
+  model: props.productData?.model || 'N/A',
   price: Number(props.productData?.price) || 0,
-  brand_name: props.productData?.brand_name || 'N/A',
-  size: props.productData?.size || 'N/A',
-  color: props.productData?.color || 'N/A',
-  bar_code: props.productData?.bar_code || 'N/A',
-  seller_price: Number(props.productData?.seller_price) || 0,
-  discount: Number(props.productData?.discount) || 0,
-  selling_discount: Number(props.productData?.selling_discount) || 0,
-  tax: Number(props.productData?.tax) || 0
+  inventory_id: props.productData?.inventory_id || 'N/A',
+  supplier_id: props.productData?.supplier_id || 'N/A',
+  quantity: Number(props.productData?.quantity) || 0
 }));
 
 // Add computed for subtotal amount
 const subtotalAmount = computed(() => {
-  const quantity = Number(productDetails.value.quantity);
-  const price = Number(productDetails.value.price);
-  return quantity * price;
-});
-
-// Add computed for discount amount
-const discountAmount = computed(() => {
-  return (subtotalAmount.value * (productDetails.value.discount / 100)) || 0;
-});
-
-// Add computed for tax amount
-const taxAmount = computed(() => {
-  const afterDiscount = subtotalAmount.value - discountAmount.value;
-  return (afterDiscount * (productDetails.value.tax / 100)) || 0;
+  return productDetails.value.quantity * productDetails.value.price;
 });
 
 // Add ref for shipping amount
 const shippingAmount = ref(0); // You can make this dynamic if needed
 
 // Add computed for total amount
-const totalAmount = computed(() => {
-  const subtotal = subtotalAmount.value;
-  const discount = discountAmount.value;
-  const tax = taxAmount.value;
-  const shipping = Number(shippingAmount.value);
-  
-  return subtotal - discount + tax + shipping;
-});
+const totalAmount = computed(() => subtotalAmount.value);
 </script>
 
 <template>
@@ -183,7 +158,7 @@ const totalAmount = computed(() => {
               <TruckIcon class="w-10 h-10" />
             </div>
             <div>
-              <h1 class="text-2xl font-bold text-gray-800 tracking-tight">HARDWARE ENTERPRISE</h1>
+              <h1 class="text-2xl font-bold text-gray-800 tracking-tight">Weads Horana Pvt Ltd</h1>
               <p class="text-gray-600 text-sm">Premium Building Materials & Supplies</p>
               <p class="text-gray-500 text-xs mt-1">123 Commerce Boulevard, Industrial District</p>
               <p class="text-gray-500 text-xs">Tel: (123) 456-7890 | support@hardwareenterprise.com</p>
@@ -235,11 +210,7 @@ const totalAmount = computed(() => {
               </div>
               <div class="flex border-b border-gray-100 pb-2">
                 <span class="font-medium w-40 text-gray-500">Inventory ID:</span>
-                <span class="font-semibold text-gray-800">{{ productData.inventory_id }}</span>
-              </div>
-              <div class="flex border-b border-gray-100 pb-2">
-                <span class="font-medium w-40 text-gray-500">Admin ID:</span>
-                <span class="font-semibold text-gray-800">{{ productData.admin_id }}</span>
+                <span class="font-semibold text-gray-800">{{ productDetails.inventory_id }}</span>
               </div>
               <div class="flex">
                 <span class="font-medium w-40 text-gray-500">Receiving Status:</span>
@@ -292,8 +263,8 @@ const totalAmount = computed(() => {
             <table class="w-full border-collapse">
               <thead>
                 <tr class="bg-gray-50 text-xs uppercase tracking-wider">
-                  <th class="border-b border-gray-200 p-4 text-left font-semibold text-gray-600">Item Description</th>
-                  <th class="border-b border-gray-200 p-4 text-left font-semibold text-gray-600">Specifications</th>
+                  <th class="border-b border-gray-200 p-4 text-left font-semibold text-gray-600">Item Name</th>
+                  <th class="border-b border-gray-200 p-4 text-left font-semibold text-gray-600">Model</th>
                   <th class="border-b border-gray-200 p-4 text-center font-semibold text-gray-600">Quantity</th>
                   <th class="border-b border-gray-200 p-4 text-right font-semibold text-gray-600">Unit Price</th>
                   <th class="border-b border-gray-200 p-4 text-right font-semibold text-gray-600">Total</th>
@@ -302,27 +273,13 @@ const totalAmount = computed(() => {
               <tbody class="divide-y divide-gray-200">
                 <tr class="hover:bg-gray-50 transition-colors duration-150">
                   <td class="p-4">
-                    <div class="flex items-center">
-                      <div class="h-10 w-10 flex-shrink-0 rounded bg-gray-100 flex items-center justify-center mr-3">
-                        <span class="text-xs text-gray-500">IMG</span>
-                      </div>
-                      <div>
-                        <p class="font-semibold text-gray-800">{{ productDetails.name }}</p>
-                        <p class="text-xs text-gray-500 mt-1">{{ productDetails.description }}</p>
-                        <p class="text-xs text-gray-500 mt-1">SKU: {{ productDetails.bar_code }}</p>
-                      </div>
+                    <div>
+                      <p class="font-semibold text-gray-800">{{ productDetails.name }}</p>
                     </div>
                   </td>
                   <td class="p-4">
-                    <div class="space-y-1 text-sm">
-                      <p><span class="font-medium text-gray-600">Brand:</span> <span class="text-gray-800">{{ productDetails.brand_name }}</span></p>
-                      <p><span class="font-medium text-gray-600">Size:</span> <span class="text-gray-800">{{ productDetails.size }}</span></p>
-                      <p><span class="font-medium text-gray-600">Color:</span> <span class="text-gray-800">{{ productDetails.color }}</span></p>
-                      <p class="flex items-center">
-                        <span class="font-medium text-gray-600 mr-1">Quality Check:</span>
-                        <CheckCircleIcon class="h-4 w-4 text-green-500" />
-                        <span class="text-green-500 text-xs ml-1">Passed</span>
-                      </p>
+                    <div>
+                      <p class="text-gray-800">{{ productDetails.model }}</p>
                     </div>
                   </td>
                   <td class="p-4 text-center font-semibold text-gray-800">{{ productDetails.quantity }}</td>
@@ -341,24 +298,6 @@ const totalAmount = computed(() => {
                     Rs. {{ subtotalAmount.toFixed(2) }}
                   </td>
                 </tr>
-                <tr class="bg-gray-50" v-if="productDetails.discount > 0">
-                  <td colspan="3" class="p-4 text-right font-medium text-gray-600">Discount ({{ productDetails.discount }}%):</td>
-                  <td colspan="2" class="p-4 text-right font-semibold text-red-600">
-                    - Rs. {{ discountAmount.toFixed(2) }}
-                  </td>
-                </tr>
-                <tr class="bg-gray-50" v-if="productDetails.tax > 0">
-                  <td colspan="3" class="p-4 text-right font-medium text-gray-600">Tax ({{ productDetails.tax }}%):</td>
-                  <td colspan="2" class="p-4 text-right font-semibold text-gray-800">
-                    Rs. {{ taxAmount.toFixed(2) }}
-                  </td>
-                </tr>
-                <tr class="bg-gray-50" v-if="shippingAmount > 0">
-                  <td colspan="3" class="p-4 text-right font-medium text-gray-600">Shipping:</td>
-                  <td colspan="2" class="p-4 text-right font-semibold text-gray-800">
-                    Rs. {{ Number(shippingAmount).toFixed(2) }}
-                  </td>
-                </tr>
                 <tr class="bg-blue-50">
                   <td colspan="3" class="p-4 text-right font-bold text-gray-800">Total:</td>
                   <td colspan="2" class="p-4 text-right font-bold text-blue-700 text-lg">
@@ -367,48 +306,6 @@ const totalAmount = computed(() => {
                 </tr>
               </tfoot>
             </table>
-          </div>
-        </div>
-
-        <!-- Notes Section -->
-        <div class="mb-8">
-          <h3 class="font-bold text-gray-800 mb-3 pb-2 border-b flex items-center">
-            <span class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center mr-2 text-blue-600 text-xs">4</span>
-            Notes & Comments
-          </h3>
-          <div class="border border-gray-200 p-4 rounded-lg bg-gray-50 min-h-[80px] shadow-inner">
-            <p class="text-gray-500 italic">All items received in good condition. No damages reported.</p>
-          </div>
-        </div>
-
-        <!-- Quality Control -->
-        <div class="mb-8">
-          <h3 class="font-bold text-gray-800 mb-3 pb-2 border-b flex items-center">
-            <span class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center mr-2 text-blue-600 text-xs">5</span>
-            Quality Control
-          </h3>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div class="border border-gray-200 rounded-lg p-4 bg-green-50">
-              <div class="flex items-center mb-2">
-                <CheckCircleIcon class="h-5 w-5 text-green-500 mr-2" />
-                <h4 class="font-semibold text-gray-800">Packaging Condition</h4>
-              </div>
-              <p class="text-sm text-gray-600">Excellent - No damage</p>
-            </div>
-            <div class="border border-gray-200 rounded-lg p-4 bg-green-50">
-              <div class="flex items-center mb-2">
-                <CheckCircleIcon class="h-5 w-5 text-green-500 mr-2" />
-                <h4 class="font-semibold text-gray-800">Product Condition</h4>
-              </div>
-              <p class="text-sm text-gray-600">Excellent - As specified</p>
-            </div>
-            <div class="border border-gray-200 rounded-lg p-4 bg-green-50">
-              <div class="flex items-center mb-2">
-                <CheckCircleIcon class="h-5 w-5 text-green-500 mr-2" />
-                <h4 class="font-semibold text-gray-800">Quantity Verification</h4>
-              </div>
-              <p class="text-sm text-gray-600">Correct - All items received</p>
-            </div>
           </div>
         </div>
 

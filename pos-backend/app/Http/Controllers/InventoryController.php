@@ -20,17 +20,16 @@ class InventoryController extends Controller
             return [
                 'id' => $item->id,
                 'quantity' => $item->quantity,
-                'location' => $item->location,
                 'status' => $item->status,
                 'restock_date_time' => $item->restock_date_time,
+                'added_stock_amount' => $item->added_stock_amount,
                 'product' => $item->product ? [
                     'id' => $item->product->id,
                     'name' => $item->product->name,
-                    'brand_name' => $item->product->brand_name,
-                    'description' => $item->product->description,
-                    'bar_code' => $item->product->bar_code,
-                    'calculate_length' => $item->product->calculate_length,
-                    'size' => $item->product->size,
+                    'model' => $item->product->model,
+                    'price' => $item->product->price,
+                    'supplier_id' => $item->product->supplier_id,
+                    'inventory_id' => $item->product->inventory_id,
                 ] : null,
             ];
         });
@@ -42,15 +41,17 @@ class InventoryController extends Controller
         try {
             $request->validate([
                 'quantity' => 'required|numeric',
-                'location' => 'required|string',
                 'status' => 'required|string|in:In Stock,Low Stock,Out Of Stock',
+                'restock_date_time' => 'nullable|date',
+                'added_stock_amount' => 'nullable|numeric',
             ]);
 
             $inventory = new Inventory();
             $inventory->quantity = $request->input('quantity');
-            $inventory->restock_date_time = now();
+            $inventory->restock_date_time = $request->input('restock_date_time') 
+                ? date('Y-m-d H:i:s', strtotime($request->input('restock_date_time')))
+                : now();
             $inventory->added_stock_amount = $request->input('added_stock_amount', $inventory->quantity);
-            $inventory->location = $request->input('location');
             $inventory->status = $request->input('status');
             $inventory->save();
             $this->updateStatus();
@@ -80,14 +81,12 @@ class InventoryController extends Controller
 
             $validated = $request->validate([
                 'quantity' => 'required|numeric|min:0',
-                'location' => 'required|string',
                 'status' => 'required|string|in:In Stock,Low Stock,Out Of Stock',
                 'added_stock_amount' => 'numeric|min:0',
                 'restock_date_time' => 'required|date',
             ]);
 
             $inventory->quantity = $validated['quantity'];
-            $inventory->location = $validated['location'];
             $inventory->status = $validated['status'];
 
             if (!empty($validated['added_stock_amount']) && $validated['added_stock_amount'] > 0) {
@@ -105,7 +104,6 @@ class InventoryController extends Controller
             return response()->json([
                 'id' => $inventory->id,
                 'quantity' => $quantity,
-                'location' => $inventory->location,
                 'status' => $inventory->status,
                 'added_stock_amount' => $inventory->added_stock_amount,
                 'restock_date_time' => $inventory->restock_date_time,
@@ -328,4 +326,5 @@ class LowStockDetail
         $this->location = $location;
         $this->status = $status;
     }
+    
 }

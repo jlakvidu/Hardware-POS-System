@@ -295,7 +295,7 @@ const handleSignUp = async () => {
         <div class="relative z-10 flex flex-col">
           <div>
             <h1 class="text-3xl font-bold text-white mb-8">
-              Hardware POS System
+              Weads Horana Pvt Ltd
             </h1>
             <img
               src="@/assets/sign-page img.jpg"

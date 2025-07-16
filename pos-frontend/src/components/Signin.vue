@@ -525,7 +525,7 @@ const handleResendCode = async () => {
       <div class="hidden lg:flex flex-col justify-between p-12 relative overflow-hidden h-screen" style="background-color: #050A24;">
         <div class="relative z-10 flex flex-col">
           <div>
-            <h1 class="text-3xl font-bold text-white mb-8">Hardware POS System</h1>
+            <h1 class="text-3xl font-bold text-white mb-8">Weads Horana Pvt Ltd</h1>
             <img 
               src="@/assets/sign-page img.jpg" 
               alt="POS System"

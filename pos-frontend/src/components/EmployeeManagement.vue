@@ -41,6 +41,7 @@ const newEmployee = ref({
     name: '',
     email: '',
     password: '',
+    contact_number: '',
     image: null
 })
 
@@ -86,6 +87,7 @@ const handleAddEmployee = async () => {
         formData.append('name', newEmployee.value.name)
         formData.append('email', newEmployee.value.email)
         formData.append('password', newEmployee.value.password)
+        formData.append('contact_number', newEmployee.value.contact_number)
         
         if (newEmployee.value.image) {
             formData.append('image', newEmployee.value.image)
@@ -105,6 +107,7 @@ const handleAddEmployee = async () => {
             name: '', 
             email: '', 
             password: '',
+            contact_number: '',
             image: null
         }
         imagePreview.value = ''
@@ -144,6 +147,7 @@ const handleEditEmployee = async () => {
         const updateData = {
             name: editingEmployee.value.name,
             email: editingEmployee.value.email,
+            contact_number: editingEmployee.value.contact_number,
             password: editingEmployee.value.password 
         }
 
@@ -209,9 +213,10 @@ const handleDeleteEmployee = async (employee) => {
 }
 
 const validateForm = (employee) => {
-    if (!employee.name || !employee.email) {
+    if (!employee.name || !employee.email || !employee.contact_number) {
         const missingField = !employee.name ? 'name' : 
-                           !employee.email ? 'email' : ''
+                           !employee.email ? 'email' : 
+                           !employee.contact_number ? 'contact number' : ''
         
         Swal.fire({
             icon: "error",
@@ -244,6 +249,7 @@ const openEditModal = (employee) => {
     }
     showEditModal.value = true
     showPassword.value = false  
+    editImagePreview.value = ''
 }
 
 const openViewModal = (employee) => {
@@ -287,7 +293,8 @@ const filteredEmployees = computed(() => {
 const formErrors = ref({
     name: '',
     email: '',
-    password: ''
+    password: '',
+    contact_number: ''
 })
 
 const validateInput = (field, value) => {
@@ -320,6 +327,15 @@ const validateInput = (field, value) => {
                 formErrors.value.email = ''
             }
             break
+        case 'contact_number':
+            if (!value.trim()) {
+                formErrors.value.contact_number = 'Contact number is required'
+            } else if (!/^[0-9+\-\s()]{7,20}$/.test(value.trim())) {
+                formErrors.value.contact_number = 'Invalid contact number'
+            } else {
+                formErrors.value.contact_number = ''
+            }
+            break
     }
 }
 
@@ -328,14 +344,18 @@ const isValidNewEmployee = computed(() => {
 
     return newEmployee.value.name.trim() !== '' &&
            emailRegex.test(newEmployee.value.email.trim()) &&
-           newEmployee.value.password.trim().length >= 8
+           newEmployee.value.password.trim().length >= 8 &&
+           newEmployee.value.contact_number.trim() !== '' &&
+           !formErrors.value.contact_number
 })
 
 const isValidEditEmployee = computed(() => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
     return editingEmployee.value.name?.trim() !== '' &&
-           emailRegex.test(editingEmployee.value.email?.trim())
+           emailRegex.test(editingEmployee.value.email?.trim()) &&
+           editingEmployee.value.contact_number?.trim() !== '' &&
+           !formErrors.value.contact_number
 })
 
 const imagePreview = ref('')
@@ -419,6 +439,9 @@ const showPassword = ref(false)
                                             <th class="w-1/4 px-6 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                                                 Email
                                             </th>
+                                            <th class="w-1/6 px-6 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                                                Contact Number
+                                            </th>
                                             <th class="w-1/6 px-6 py-4 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
                                                 Actions
                                             </th>
@@ -426,7 +449,7 @@ const showPassword = ref(false)
                                     </thead>
                                     <tbody class="divide-y divide-gray-700">
                                         <tr v-if="isLoading" class="hover:bg-gray-700">
-                                            <td colspan="5" class="h-[400px] relative">
+                                            <td colspan="6" class="h-[400px] relative">
                                                 <div class="absolute inset-0 flex flex-col items-center justify-center space-y-4">
                                                     <div class="loader-container">
                                                         <div class="loader">
@@ -449,12 +472,12 @@ const showPassword = ref(false)
                                             </td>
                                         </tr>
                                         <tr v-else-if="employees.length === 0" class="hover:bg-gray-700">
-                                            <td colspan="5" class="px-6 py-8 text-center text-gray-400">
+                                            <td colspan="6" class="px-6 py-8 text-center text-gray-400">
                                                 No employees found
                                             </td>
                                         </tr>
                                         <tr v-else-if="filteredEmployees.length === 0" class="hover:bg-gray-700">
-                                            <td colspan="5" class="px-6 py-8 text-center text-gray-400">
+                                            <td colspan="6" class="px-6 py-8 text-center text-gray-400">
                                                 <div class="flex flex-col items-center justify-center space-y-2">
                                                     <MagnifyingGlassIcon class="w-6 h-6 text-gray-500" />
                                                     <span>No results found for "{{ searchQuery }}"</span>
@@ -490,6 +513,12 @@ const showPassword = ref(false)
                                                     <div class="flex items-center">
                                                         <EnvelopeIcon class="w-4 h-4 text-gray-400 mr-2" />
                                                         {{ employee.email }}
+                                                    </div>
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                                                    <div class="flex items-center">
+                                                        <PhoneIcon class="w-4 h-4 text-gray-400 mr-2" />
+                                                        {{ employee.contact_number }}
                                                     </div>
                                                 </td>
                                                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
@@ -551,6 +580,20 @@ const showPassword = ref(false)
                                             placeholder="Enter employee name" 
                                             required>
                                         <p v-if="formErrors.name" class="mt-1 text-sm text-red-500">{{ formErrors.name }}</p>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-300 mb-1">Contact Number</label>
+                                        <input v-model="newEmployee.contact_number"
+                                            @input="validateInput('contact_number', newEmployee.contact_number)"
+                                            type="text"
+                                            class="w-full px-4 py-2.5 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border"
+                                            :class="[
+                                                formErrors.contact_number ? 'border-red-500' : 'border-gray-600',
+                                                !formErrors.contact_number && newEmployee.contact_number ? 'border-blue-500' : ''
+                                            ]"
+                                            placeholder="Enter contact number"
+                                            required>
+                                        <p v-if="formErrors.contact_number" class="mt-1 text-sm text-red-500">{{ formErrors.contact_number }}</p>
                                     </div>
                                 </div>
 
@@ -697,6 +740,20 @@ const showPassword = ref(false)
                                             placeholder="Enter employee name" 
                                             required>
                                         <p v-if="formErrors.name" class="mt-1 text-sm text-red-500">{{ formErrors.name }}</p>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-300 mb-1">Contact Number</label>
+                                        <input v-model="editingEmployee.contact_number"
+                                            @input="validateInput('contact_number', editingEmployee.contact_number)"
+                                            type="text"
+                                            class="w-full px-4 py-2.5 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border"
+                                            :class="[
+                                                formErrors.contact_number ? 'border-red-500' : 'border-gray-600',
+                                                !formErrors.contact_number && editingEmployee.contact_number ? 'border-purple-500' : ''
+                                            ]"
+                                            placeholder="Enter contact number"
+                                            required>
+                                        <p v-if="formErrors.contact_number" class="mt-1 text-sm text-red-500">{{ formErrors.contact_number }}</p>
                                     </div>
                                 </div>
 
@@ -857,6 +914,14 @@ const showPassword = ref(false)
                                 <p class="text-white flex items-center">
                                     <EnvelopeIcon class="w-5 h-5 text-gray-400 mr-2" />
                                     {{ viewingEmployee.email }}
+                                </p>
+                            </div>
+
+                            <div class="bg-gray-800/50 backdrop-blur-sm p-4 rounded-lg border border-gray-700/30 hover:border-blue-500/50 transition-colors duration-300">
+                                <h3 class="text-sm font-medium text-blue-400 uppercase mb-2">Contact Number</h3>
+                                <p class="text-white flex items-center">
+                                    <PhoneIcon class="w-5 h-5 text-gray-400 mr-2" />
+                                    {{ viewingEmployee.contact_number }}
                                 </p>
                             </div>
                         </div>
