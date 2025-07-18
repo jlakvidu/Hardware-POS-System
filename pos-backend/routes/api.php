@@ -22,6 +22,8 @@ use App\Http\Controllers\AssetController;
 use App\Http\Controllers\InvestmentController;
 use App\Http\Controllers\LoanController;
 use App\Http\Controllers\DailyExpensesController;
+use App\Http\Controllers\ProductReturnController;
+use App\Http\Controllers\SupplierPaymentController;
 
 // Cashier Routes
 Route::prefix('cashiers')->group(function () {
@@ -192,6 +194,17 @@ Route::prefix('api')->group(function () {
     Route::put('/daily-expenses/{id}', [DailyExpensesController::class, 'update']);
     Route::delete('/daily-expenses/{id}', [DailyExpensesController::class, 'destroy']);
 });
+
+// product returns
+Route::get('/product-returns', [ProductReturnController::class, 'index']);
+Route::post('/product-returns', [ProductReturnController::class, 'store']);
+Route::get('/product-returns/{id}', [ProductReturnController::class, 'show']);
+Route::put('/product-returns/{id}', [ProductReturnController::class, 'update']);
+Route::delete('/product-returns/{id}', [ProductReturnController::class, 'destroy']);
+
+// Supplier Payments
+Route::get('/supplier-payments', [SupplierPaymentController::class, 'index']);
+Route::post('/supplier-payments', [SupplierPaymentController::class, 'store']);
 
 Route::get('/', function () {
     return response()->json([

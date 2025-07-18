@@ -57,6 +57,7 @@ class SalesController extends Controller
                 'remaining_balance' => 'nullable|numeric|min:0',
                 'payment_status' => 'required|string',
                 'customer_id' => 'nullable|exists:customers,id',
+                // Only require check_details fields if payment_type is CHECK
                 'check_details' => 'nullable|array',
                 'check_details.bankName' => 'required_if:payment_type,CHECK',
                 'check_details.checkNumber' => 'required_if:payment_type,CHECK',
@@ -66,6 +67,7 @@ class SalesController extends Controller
                 'items.*.width' => 'nullable|numeric|min:0',
                 'items.*.height' => 'nullable|numeric|min:0',
                 'items.*.totalAreaMeters' => 'nullable|numeric|min:0',
+                'items.*.specialNote' => 'nullable|string|max:255', // <-- Add this line
             ]);
 
             $total = 0;
@@ -144,6 +146,7 @@ class SalesController extends Controller
                         'width_inch' => $widthInch,
                         'height_inch' => $heightInch,
                         'area_sqm' => $areaSqm,
+                        'special_note' => $item['specialNote'] ?? null, // <-- Add this line
                     ]);
                     $inventory->quantity = round($inventory->quantity - $item['quantity'], 2);
                     $inventory->save();
@@ -203,6 +206,8 @@ class SalesController extends Controller
                 'payment_type' => 'required|in:CASH,CARD,CHECK,ONLINE',
                 'items' => 'required',
                 'status' => 'required',
+                // Add validation for specialNote if present
+                'items.*.specialNote' => 'nullable|string|max:255',
             ]);
         } catch (\Illuminate\Validation\ValidationException $th) {
             return response()->json([
@@ -231,7 +236,136 @@ class SalesController extends Controller
 
         DB::beginTransaction();
         try {
-            $this->updateSales($request, $sales, $salesRecord);
+            // Update sales record
+            $sales->update($salesRecord);
+
+            $product_sales = Product_sales::where('sales_id', $sales['id'])->get()->keyBy('product_id');
+
+            $updateData = [];
+            $newItems = [];
+            $deleteIds = [];
+            $inventoryUpdates = [];
+            $currentTimeStamp = now();
+
+            $productIds = collect($request->get('items'))->pluck('product_id')->unique();
+            $products = Product::whereIn('id', $productIds)->get()->keyBy('id');
+
+            foreach ($request->get('items') as $newItem) {
+                $product = $products->get($newItem['product_id']);
+
+                if (!$product) {
+                    throw new \Exception("Product with ID {$newItem['product_id']} not found.");
+                }
+
+                $inventory = $product->inventory;
+                if (!$inventory) {
+                    throw new \Exception("Inventory for Product with ID {$newItem['product_id']} not found.");
+                }
+
+                // Always recalculate area_sqm from width and height, round to 2 decimals
+                $widthInch = isset($newItem['width']) ? $newItem['width'] : null;
+                $heightInch = isset($newItem['height']) ? $newItem['height'] : null;
+                $areaSqm = null;
+                if ($widthInch !== null && $heightInch !== null) {
+                    $areaSqm = round($widthInch * $heightInch * 0.00064516, 2);
+                }
+
+                $specialNote = isset($newItem['specialNote']) ? $newItem['specialNote'] : null; // <-- Add this line
+
+                if (isset($product_sales[$newItem['product_id']])) {
+                    $existingItem = $product_sales[$newItem['product_id']];
+                    $quantityDiff = $newItem['quantity'] - $existingItem->quantity;
+
+                    if ($quantityDiff !== 0) {
+                        if ($quantityDiff > 0 && $inventory->quantity < $quantityDiff) {
+                            throw new \Exception("Not enough stock for Product ID {$newItem['product_id']}");
+                        }
+
+                        $newQuantity = $inventory->quantity - $quantityDiff;
+                        $inventoryUpdates[] = [
+                            'inventory_id' => $inventory->id,
+                            'new_quantity' => $newQuantity
+                        ];
+                    }
+
+                    $updateData[] = [
+                        'product_id' => $newItem['product_id'],
+                        'sales_id' => $sales['id'],
+                        'quantity' => $newItem['quantity'],
+                        'price' => $newItem['price'],
+                        'width_inch' => $widthInch,
+                        'height_inch' => $heightInch,
+                        'area_sqm' => $areaSqm,
+                        'special_note' => $specialNote, // <-- Add this line
+                    ];
+
+                    unset($product_sales[$newItem['product_id']]);
+                } else {
+                    if ($inventory->quantity < $newItem['quantity']) {
+                        throw new \Exception("Not enough stock for Product ID {$newItem['product_id']}");
+                    }
+
+                    $newItems[] = [
+                        'product_id' => $newItem['product_id'],
+                        'sales_id' => $sales['id'],
+                        'quantity' => $newItem['quantity'],
+                        'price' => $newItem['price'],
+                        'width_inch' => $widthInch,
+                        'height_inch' => $heightInch,
+                        'area_sqm' => $areaSqm,
+                        'special_note' => $specialNote, // <-- Add this line
+                        'created_at' => $currentTimeStamp,
+                        'updated_at' => $currentTimeStamp
+                    ];
+
+                    $inventoryUpdates[] = [
+                        'inventory_id' => $inventory->id,
+                        'new_quantity' => $inventory->quantity - $newItem['quantity']
+                    ];
+                }
+            }
+
+            $deleteIds = $product_sales->keys()->toArray();
+            if (!empty($deleteIds)) {
+                Product_sales::whereIn('product_id', $deleteIds)
+                    ->where('sales_id', $sales['id'])
+                    ->delete();
+
+                foreach ($product_sales as $deletedItem) {
+                    $product = Product::find($deletedItem->product_id);
+                    if ($product && $product->inventory) {
+                        $inventoryUpdates[] = [
+                            'inventory_id' => $product->inventory->id,
+                            'new_quantity' => $product->inventory->quantity + $deletedItem->quantity
+                        ];
+                    }
+                }
+            }
+
+            foreach ($updateData as $data) {
+                Product_sales::where('product_id', $data['product_id'])
+                    ->where('sales_id', $data['sales_id'])
+                    ->update([
+                        'quantity' => $data['quantity'],
+                        'price' => $data['price'],
+                        'width_inch' => $data['width_inch'],
+                        'height_inch' => $data['height_inch'],
+                        'area_sqm' => $data['area_sqm'],
+                        'special_note' => $data['special_note'], // <-- Add this line
+                    ]);
+            }
+
+            if (!empty($newItems)) {
+                Product_sales::insert($newItems);
+            }
+
+            foreach ($inventoryUpdates as $update) {
+                $inventory = Inventory::find($update['inventory_id']);
+                if ($inventory) {
+                    $inventory->update(['quantity' => $update['new_quantity']]);
+                    $this->updateInventoryStatus($inventory);
+                }
+            }
 
             DB::commit();
         } catch (\Throwable $th) {
@@ -373,6 +507,16 @@ class SalesController extends Controller
                 throw new \Exception("Inventory for Product with ID {$newItem['product_id']} not found.");
             }
 
+            // Always recalculate area_sqm from width and height, round to 2 decimals
+            $widthInch = isset($newItem['width']) ? $newItem['width'] : null;
+            $heightInch = isset($newItem['height']) ? $newItem['height'] : null;
+            $areaSqm = null;
+            if ($widthInch !== null && $heightInch !== null) {
+                $areaSqm = round($widthInch * $heightInch * 0.00064516, 2);
+            }
+
+            $specialNote = isset($newItem['specialNote']) ? $newItem['specialNote'] : null; // <-- Add this line
+
             if (isset($product_sales[$newItem['product_id']])) {
                 $existingItem = $product_sales[$newItem['product_id']];
                 $quantityDiff = $newItem['quantity'] - $existingItem->quantity;
@@ -393,7 +537,11 @@ class SalesController extends Controller
                     'product_id' => $newItem['product_id'],
                     'sales_id' => $sales['id'],
                     'quantity' => $newItem['quantity'],
-                    'price' => $newItem['price']
+                    'price' => $newItem['price'],
+                    'width_inch' => $widthInch,
+                    'height_inch' => $heightInch,
+                    'area_sqm' => $areaSqm,
+                    'special_note' => $specialNote, // <-- Add this line
                 ];
 
                 unset($product_sales[$newItem['product_id']]);
@@ -407,6 +555,10 @@ class SalesController extends Controller
                     'sales_id' => $sales['id'],
                     'quantity' => $newItem['quantity'],
                     'price' => $newItem['price'],
+                    'width_inch' => $widthInch,
+                    'height_inch' => $heightInch,
+                    'area_sqm' => $areaSqm,
+                    'special_note' => $specialNote, // <-- Add this line
                     'created_at' => $currentTimeStamp,
                     'updated_at' => $currentTimeStamp
                 ];
@@ -440,7 +592,11 @@ class SalesController extends Controller
                 ->where('sales_id', $data['sales_id'])
                 ->update([
                     'quantity' => $data['quantity'],
-                    'price' => $data['price']
+                    'price' => $data['price'],
+                    'width_inch' => $data['width_inch'],
+                    'height_inch' => $data['height_inch'],
+                    'area_sqm' => $data['area_sqm'],
+                    'special_note' => $data['special_note'], // <-- Add this line
                 ]);
         }
 

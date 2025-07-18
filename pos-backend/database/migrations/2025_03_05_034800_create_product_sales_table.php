@@ -23,6 +23,7 @@ return new class extends Migration
             $table->double('width_inch')->nullable();
             $table->double('height_inch')->nullable();
             $table->double('area_sqm')->nullable();
+            $table->string('special_note', 255)->nullable();
         });
     }
 

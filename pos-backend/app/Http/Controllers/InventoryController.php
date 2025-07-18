@@ -16,7 +16,7 @@ class InventoryController extends Controller
 {
     public function index()
     {
-        $inventory = Inventory::with('product')->get()->map(function ($item) {
+        $inventory = Inventory::with(['product.supplier'])->get()->map(function ($item) {
             return [
                 'id' => $item->id,
                 'quantity' => $item->quantity,
@@ -30,6 +30,13 @@ class InventoryController extends Controller
                     'price' => $item->product->price,
                     'supplier_id' => $item->product->supplier_id,
                     'inventory_id' => $item->product->inventory_id,
+                    'image_url' => $item->product->image_url ?? null, // Add image if exists
+                    'supplier' => $item->product->supplier ? [
+                        'id' => $item->product->supplier->id,
+                        'name' => $item->product->supplier->name,
+                        'email' => $item->product->supplier->email,
+                        'contact' => $item->product->supplier->contact,
+                    ] : null,
                 ] : null,
             ];
         });

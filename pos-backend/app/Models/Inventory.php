@@ -26,5 +26,18 @@ class Inventory extends Model
     public function product(): HasOne
     {
         return $this->hasOne(Product::class, 'inventory_id');
-}
+    }
+
+    // Add supplier relationship via product
+    public function supplier()
+    {
+        return $this->hasOneThrough(
+            \App\Models\Supplier::class,
+            \App\Models\Product::class,
+            'inventory_id', // Foreign key on products table
+            'id',           // Foreign key on suppliers table
+            'id',           // Local key on inventories table
+            'supplier_id'   // Local key on products table
+        );
+    }
 }

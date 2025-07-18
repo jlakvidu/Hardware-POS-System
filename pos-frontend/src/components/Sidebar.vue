@@ -52,7 +52,8 @@ const menuSections = [
     items: [
       { name: 'Place Order', icon: ClipboardDocumentListIcon, route: '/place-order' },
       { name: 'Order List', icon: ClipboardDocumentListIcon, route: '/order-management' },
-      { name: 'Return Items', icon: RotateCcw, route: '/return-items' },
+      { name: 'Order Return Details', icon: RotateCcw, route: '/return-items' },
+      { name: 'Product Return Details', icon: RotateCcw, route: '/product-return-details' },
     ]
   }
 ]

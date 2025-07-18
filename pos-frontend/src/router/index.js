@@ -11,9 +11,10 @@ import PlaceOrder from "@/components/PlaceOrder.vue";
 import LowStock from "@/components/LowStock.vue";
 import OrderManagement from "@/components/OrderManagement.vue";
 import InventoryManagement from "@/components/InventoryManagement.vue";
-import ReturnItem from "@/components/ReturnItem.vue";
+import ReturnItem from "@/components/OrderReturnDetails.vue";
 import ManageAccountDetails from "@/components/ManageAccountDetails.vue";
 import CustomersCashier from "@/components/Customers-cashier.vue";
+import ProductReturnDetails from '@/components/ProductReturnDetails.vue'
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -92,7 +93,12 @@ const router = createRouter({
             path: "/customers-cashier",
             name: "CustomersCashier",
             component: CustomersCashier
-        }
+        },
+        {
+            path: '/product-return-details',
+            name: 'ProductReturnDetails',
+            component: ProductReturnDetails
+          }
     ]
 });
 

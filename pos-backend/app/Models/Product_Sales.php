@@ -15,6 +15,7 @@ class Product_Sales extends Model
         'width_inch',
         'height_inch',
         'area_sqm',
+        'special_note',
         // ...other fields...
     ];
 

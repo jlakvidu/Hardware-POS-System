@@ -109,13 +109,16 @@ const dateRanges = [
   { id: 'custom', label: 'Custom Range' }
 ]
 
+// Update paymentMethods to match backend enum
 const paymentMethods = [
   { id: 'all', label: 'All Methods' },
   { id: 'CASH', label: 'Cash' },
-  { id: 'CREDIT_CARD', label: 'Credit Card' },
-  { id: 'DEBIT_CARD', label: 'Debit Card' }
+  { id: 'CARD', label: 'Card' },
+  { id: 'CHECK', label: 'Check' },
+  { id: 'ONLINE', label: 'Online' }
 ]
 
+// Update orderStatuses if needed (backend: 1=completed, 2=pending/partial)
 const orderStatuses = [
   { id: 'all', label: 'All Statuses' },
   { id: 'completed', label: 'Completed' },
@@ -124,9 +127,19 @@ const orderStatuses = [
   { id: 'processing', label: 'Processing' }
 ]
 
+const paymentStatusOptions = [
+  { id: 'all', label: 'All Payment Status' },
+  { id: 'FULL_PAYMENT', label: 'Full Payment' },
+  { id: 'PARTIALLY_PAID', label: 'Advance Payment' },
+  { id: 'PENDING', label: 'Pending Payment' } // <-- Add this line
+]
+const selectedPaymentStatus = ref('all')
+
 const orders = ref([])
 const isLoading = ref(false)
+const isUpdating = ref(false) // Add this line to fix the error
 
+// Update fetchOrders to use correct payment_type and status
 const fetchOrders = async () => {
   isLoading.value = true
   try {
@@ -134,36 +147,62 @@ const fetchOrders = async () => {
     console.log('API Response:', response.data)
     // Sort orders by ID before mapping
     const sortedData = response.data.data.sort((a, b) => b.id - a.id)
-    orders.value = sortedData.map(order => ({
-      id: order.id,
-      customer_id: order.customer_id,
-      customer: order.customer ? {
-        id: order.customer.id,
-        name: order.customer.name,
-        email: order.customer.email,
-        phone: order.customer.phone
-      } : null,
-      cashier_id: order.cashier_id,
-      date: order.time,
-      items: order.product_sales?.length || 0,
-      total: order.amount,
-      status: getOrderStatus(order.status),
-      payment: order.payment_type,
-      products: order.product_sales ? order.product_sales.map(ps => ({
-        id: ps.product?.id,
-        name: ps.product?.name || 'Unknown Product',
-        description: ps.product?.description || '',
-        quantity: ps.quantity,
-        price: ps.price,
-        total: ps.price * ps.quantity,
-        brand: ps.product?.brand_name,
-        size: ps.product?.size,
-        color: ps.product?.color,
-        barCode: ps.product?.bar_code
-      })) : [],
-      discount: order.discount || 0,
-      subtotal: order.product_sales?.reduce((sum, ps) => sum + (ps.price * ps.quantity), 0) || 0
-    }))
+    orders.value = sortedData.map(order => {
+      // --- Payment status logic fix ---
+      let paymentStatusType = 'FULL_PAYMENT'
+      if (order.payment_status) {
+        paymentStatusType = order.payment_status
+      } else if (
+        (order.advance_amount && Number(order.advance_amount) > 0) &&
+        (order.remaining_balance && Number(order.remaining_balance) > 0)
+      ) {
+        paymentStatusType = 'ADVANCE_PAYMENT'
+      }
+
+      return {
+        id: order.id,
+        customer_id: order.customer_id,
+        customer: order.customer ? {
+          id: order.customer.id,
+          name: order.customer.name,
+          email: order.customer.email,
+          phone: order.customer.phone
+        } : null,
+        cashier_id: order.cashier_id,
+        date: order.time,
+        items: order.product_sales?.length || 0,
+        total: order.amount,
+        // Map backend status (1=completed, 2=pending/partial)
+        status: order.status === 1 ? 'completed' : (order.status === 2 ? 'pending' : 'unknown'),
+        payment: order.payment_type,
+        payment_status_type: paymentStatusType,
+        advance_amount: order.advance_amount,
+        remaining_balance: order.remaining_balance,
+        products: order.product_sales ? order.product_sales.map(ps => ({
+          id: ps.product?.id,
+          name: ps.product?.name || 'Unknown Product',
+          description: ps.product?.description || '',
+          quantity: ps.quantity,
+          price: ps.price,
+          total: ps.price * ps.quantity,
+          // Add these fields for view/update modals
+          width_inch: ps.width_inch ?? ps.width ?? null,
+          height_inch: ps.height_inch ?? ps.height ?? null,
+          area_sqm: ps.area_sqm ?? ps.area ?? null,
+          brand: ps.product?.brand_name,
+          size: ps.product?.size,
+          color: ps.product?.color,
+          barCode: ps.product?.bar_code,
+          special_note: ps.special_note ?? '', // <-- Add this line
+        })) : [],
+        // --- Fix: load discount from backend (not just default 0) ---
+        discount: typeof order.discount !== 'undefined' ? order.discount : (order.cart_discount || 0),
+        cart_discount: order.cart_discount || 0,
+        product_discounts_total: order.product_discounts_total || 0,
+        total_discount_amount: order.total_discount_amount || 0,
+        subtotal: order.product_sales?.reduce((sum, ps) => sum + (ps.price * ps.quantity), 0) || 0
+      }
+    })
   } catch (error) {
     console.error('Error fetching orders:', error)
     Swal.fire({
@@ -179,17 +218,35 @@ const fetchOrders = async () => {
   }
 }
 
+// Update getOrderStatus to match backend
 const getOrderStatus = (status) => {
-  return status === 1 ? 'completed' : 'pending'
+  return status === 1 ? 'completed' : (status === 2 ? 'pending' : 'unknown')
 }
 
 const formatPaymentType = (type) => {
   const types = {
     'CASH': 'cash',
-    'CREDIT_CARD': 'card',
-    'DEBIT_CARD': 'card'
+    'CARD': 'card',
+    'CHECK': 'check',
+    'ONLINE': 'online'
   }
-  return types[type] || type.toLowerCase()
+  return types[type] || type?.toLowerCase() || ''
+}
+
+// Update getPaymentIcon to match new payment types
+const getPaymentIcon = (method) => {
+  switch (method) {
+    case 'CASH':
+      return Banknote
+    case 'CARD':
+      return CreditCard
+    case 'CHECK':
+      return FileText
+    case 'ONLINE':
+      return CreditCard
+    default:
+      return CreditCard
+  }
 }
 
 // Add these helper methods for creating/updating orders
@@ -199,7 +256,7 @@ const createOrder = async (orderData) => {
       customer_id: orderData.customer_id,
       cashier_id: orderData.cashier_id,
       payment_type: orderData.payment_type,
-      status: orderData.status === 'completed' ? 1 : 0,
+      status: orderData.status === 'completed' ? 1 : 2,
       time: new Date().toISOString(),
       amount: orderData.total,
       items: orderData.products.map(p => ({
@@ -220,7 +277,7 @@ const updateOrderInAPI = async (id, orderData) => {
       customer_id: orderData.customer_id,
       cashier_id: orderData.cashier_id,
       payment_type: orderData.payment_type,
-      status: orderData.status === 'completed' ? 1 : 0,
+      status: orderData.status === 'completed' ? 1 : 2,
       time: new Date().toISOString(),
       amount: orderData.total,
       items: orderData.products.map(p => ({
@@ -296,6 +353,15 @@ const filteredOrders = computed(() => {
     })
   }
 
+  // Add payment status filter
+  if (selectedPaymentStatus.value !== 'all') {
+    result = result.filter(order => {
+      // Accept both string and DB enum
+      const status = (order.payment_status_type || '').toUpperCase()
+      return status === selectedPaymentStatus.value
+    })
+  }
+
   // Apply sorting
   result = result.sort((a, b) => {
     let valueA, valueB
@@ -343,6 +409,14 @@ const paginatedOrders = computed(() => {
 
 const totalPages = computed(() => {
   return Math.ceil(filteredOrders.value.length / itemsPerPage.value)
+})
+
+// --- Add computed for splitting orders into two tables after 10 orders ---
+const firstTableOrders = computed(() => {
+  return paginatedOrders.value.slice(0, 10)
+})
+const secondTableOrders = computed(() => {
+  return paginatedOrders.value.slice(10)
 })
 
 const statusCounts = computed(() => {
@@ -396,6 +470,7 @@ const resetFilters = () => {
   searchQuery.value = ''
   selectedDateRange.value = 'all'
   selectedPaymentMethod.value = 'all'
+  selectedPaymentStatus.value = 'all'
   customStartDate.value = ''
   customEndDate.value = ''
   currentPage.value = 1
@@ -705,9 +780,10 @@ const printOrderDetails = () => {
           
           <div class="order-info-box">
             <h2>Customer Information</h2>
-            <p><strong>Customer:</strong> ${currentOrderDetail.value.customer}</p>
-            <p><strong>Items:</strong> ${currentOrderDetail.value.items}</p>
-            <p><strong>Total Amount:</strong> Rs. ${currentOrderDetail.value.total.toLocaleString()}</p>
+            <p><strong>Customer ID:</strong> ${currentOrderDetail.value.customer_id || 'N/A'}</p>
+            <p><strong>Name:</strong> ${currentOrderDetail.value.customer ? currentOrderDetail.value.customer.name : 'Walk-in Customer'}</p>
+            <p><strong>Email:</strong> ${currentOrderDetail.value.customer ? currentOrderDetail.value.customer.email : 'N/A'}</p>
+            <p><strong>Phone:</strong> ${currentOrderDetail.value.customer ? currentOrderDetail.value.customer.phone : 'N/A'}</p>
           </div>
         </div>
         
@@ -716,6 +792,7 @@ const printOrderDetails = () => {
           <thead>
             <tr>
               <th>Product</th>
+              <th>Description</th>
               <th style="text-align: center;">Quantity</th>
               <th style="text-align: right;">Unit Price</th>
               <th style="text-align: right;">Subtotal</th>
@@ -729,15 +806,15 @@ const printOrderDetails = () => {
         <div class="totals">
           <div class="total-row">
             <span>Subtotal:</span>
-            <span>Rs. ${currentOrderDetail.value.total.toLocaleString()}</span>
+            <span>Rs. ${currentOrderDetail.total.toLocaleString()}</span>
           </div>
           <div class="total-row">
             <span>Tax (5%):</span>
-            <span>Rs. ${(currentOrderDetail.value.total * 0.05).toLocaleString()}</span>
+            <span>Rs. ${(currentOrderDetail.total * 0.05).toLocaleString()}</span>
           </div>
           <div class="total-row final-total">
             <span>Total:</span>
-            <span>Rs. ${(currentOrderDetail.value.total * 1.05).toLocaleString()}</span>
+            <span>Rs. ${(currentOrderDetail.total * 1.05).toLocaleString()}</span>
           </div>
         </div>
         
@@ -756,61 +833,7 @@ const printOrderDetails = () => {
   `)
 }
 
-// Add loading state for delete/update operations
-const isDeleting = ref(false)
-const isUpdating = ref(false)
-
-// Replace existing deleteOrder function
-const deleteOrder = async (orderId) => {
-  try {
-    const result = await Swal.fire({
-      title: 'Delete Order?',
-      text: `Are you sure you want to delete order ${orderId}? This action cannot be undone.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#EF4444',
-      cancelButtonColor: '#6B7280',
-      confirmButtonText: 'Yes, delete it',
-      background: '#1e293b',
-      color: '#ffffff'
-    })
-
-    if (result.isConfirmed) {
-      isDeleting.value = true
-      await connection.delete(`/sales/${orderId}`)
-
-      // Remove from local state
-      orders.value = orders.value.filter(order => order.id !== orderId)
-      const index = selectedOrders.value.indexOf(orderId)
-      if (index !== -1) {
-        selectedOrders.value.splice(index, 1)
-      }
-
-      Swal.fire({
-        title: 'Deleted!',
-        text: `Order ${orderId} has been deleted.`,
-        icon: 'success',
-        confirmButtonColor: '#3B82F6',
-        background: '#1e293b',
-        color: '#ffffff'
-      })
-    }
-  } catch (error) {
-    console.error('Error deleting order:', error)
-    Swal.fire({
-      title: 'Error',
-      text: error.response?.data?.message || 'Failed to delete order',
-      icon: 'error',
-      confirmButtonColor: '#3B82F6',
-      background: '#1e293b',
-      color: '#ffffff'
-    })
-  } finally {
-    isDeleting.value = false
-  }
-}
-
-// Replace existing updateOrder function
+// In updateOrder, send width_inch, height_inch, area_sqm in items
 const updateOrder = async () => {
   if (!editingOrder.value) return
 
@@ -830,21 +853,25 @@ const updateOrder = async () => {
     if (result.isConfirmed) {
       isUpdating.value = true
 
-      // Format the update data to match the expected structure
+      // Map frontend fields to backend expected fields
       const updateData = {
         customer_id: editingOrder.value.customer_id,
         cashier_id: editingOrder.value.cashier_id,
         payment_type: editingOrder.value.payment,
         time: editingOrder.value.date,
-        status: editingOrder.value.status === 'completed' ? 1 : 0,
-        amount: editingOrder.value.products.reduce((sum, p) => sum + (p.price * p.quantity), 0),
+        status: editingOrder.value.status === 'completed' ? 1 : 2,
+        amount: editingOrder.value.total,
+        discount: editingOrder.value.discount || 0,
         items: editingOrder.value.products.map(p => ({
           product_id: p.id,
           quantity: p.quantity,
-          price: p.price
-        })),
-        discount: editingOrder.value.discount || 0,
-        amount: calculateTotal(editingOrder.value)
+          price: p.price,
+          // Map to backend field names
+          width: p.width_inch ?? null,
+          height: p.height_inch ?? null,
+          totalAreaMeters: p.area_sqm ?? null,
+          specialNote: p.special_note ?? '', // <-- Add this line
+        }))
       }
 
       const response = await connection.put(`/sales/${editingOrder.value.id}`, updateData)
@@ -1008,19 +1035,6 @@ const getStatusIcon = (status) => {
       return RefreshCw
     default:
       return AlertCircle
-  }
-}
-
-const getPaymentIcon = (method) => {
-  switch (method) {
-    case 'cash':
-      return Banknote
-    case 'card':
-      return CreditCard
-    case 'bank':
-      return FileText
-    default:
-      return CreditCard
   }
 }
 
@@ -1225,7 +1239,7 @@ const calculateTotal = (order) => {
         class="bg-[#1a2234]/95 border-b border-[#334155] py-5 animate-slide-down shadow-lg backdrop-blur-sm">
         <div class="max-w-[1920px] mx-auto px-4">
           <div class="flex flex-col md:flex-row gap-4 md:items-end">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-1">
               <div>
                 <label class="block text-sm text-gray-400 mb-1.5 font-medium" for="date-filter">Date Range</label>
                 <div class="space-y-3">
@@ -1275,6 +1289,20 @@ const calculateTotal = (order) => {
                     class="appearance-none bg-[#1e293b] border border-[#334155] rounded-lg pl-4 pr-10 py-2.5 w-full focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/30 text-white">
                     <option v-for="method in paymentMethods" :key="method.id" :value="method.id">
                       {{ method.label }}
+                    </option>
+                  </select>
+                  <CreditCard
+                    class="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-sm text-gray-400 mb-1.5 font-medium" for="payment-status-filter">Payment Status</label>
+                <div class="relative">
+                  <select id="payment-status-filter" v-model="selectedPaymentStatus"
+                    class="appearance-none bg-[#1e293b] border border-[#334155] rounded-lg pl-4 pr-10 py-2.5 w-full focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/30 text-white">
+                    <option v-for="option in paymentStatusOptions" :key="option.id" :value="option.id">
+                      {{ option.label }}
                     </option>
                   </select>
                   <CreditCard
@@ -1384,6 +1412,7 @@ const calculateTotal = (order) => {
           </div>
 
           <div class="overflow-x-auto">
+            <!-- First table: first 10 orders -->
             <table class="w-full min-w-[800px]">
               <thead>
                 <tr class="bg-gradient-to-r from-[#1e293b]/70 to-[#1e293b]/50 text-gray-400 text-sm">
@@ -1440,7 +1469,7 @@ const calculateTotal = (order) => {
                     Loading orders...
                   </td>
                 </tr>
-                <tr v-else-if="paginatedOrders.length === 0">
+                <tr v-else-if="firstTableOrders.length === 0">
                   <td colspan="9" class="py-12 text-center text-gray-500">
                     <Package class="w-16 h-16 mx-auto mb-4 opacity-30" />
                     <p class="text-lg font-medium">No orders found</p>
@@ -1448,7 +1477,127 @@ const calculateTotal = (order) => {
                   </td>
                 </tr>
 
-                <tr v-for="order in paginatedOrders" :key="order.id"
+                <tr v-for="order in firstTableOrders" :key="order.id"
+                  class="border-t border-[#334155]/30 hover:bg-[#1e293b]/50 transition-colors duration-200">
+                  <td class="py-4 px-4">
+                    <input type="checkbox" :checked="selectedOrders.includes(order.id)"
+                      @change="toggleOrderSelection(order.id)"
+                      class="rounded border-gray-600 text-[#3b82f6] focus:ring-[#3b82f6]/30 bg-gray-700 w-4 h-4"
+                      :aria-label="`Select order ${order.id}`" />
+                  </td>
+                  <td class="py-4 px-4 font-medium text-[#4dabf7]">{{ order.id }}</td>
+                  <td class="py-4 px-4">
+                    <div class="flex items-center gap-2">
+                      <div class="w-8 h-8 rounded-full flex items-center justify-center"
+                        :class="{
+                          'bg-[#3b82f6]/20 text-[#3b82f6]': order.customer,
+                          'bg-yellow-500/20 text-yellow-400': !order.customer
+                        }">
+                        <User class="w-4 h-4" />
+                      </div>
+                      <div class="flex flex-col">
+                        <div class="flex items-center gap-2">
+                          <span>{{ order.customer ? order.customer.name : 'Walk-in Customer' }}</span>
+                          <span v-if="!order.customer" 
+                            class="px-1.5 py-0.5 text-[10px] font-medium bg-yellow-500/20 text-yellow-400 rounded-full">
+                            WALK-IN
+                          </span>
+                        </div>
+                        <span v-if="order.customer" class="text-xs text-gray-400">
+                          {{ order.customer.email || 'No email' }}
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="py-4 px-4">
+                    <div class="flex flex-col">
+                      <span>{{ formatDate(order.date) }}</span>
+                      <span class="text-xs text-gray-400 mt-1">{{ formatTime(order.date) }}</span>
+                    </div>
+                  </td>
+                  <td class="py-4 px-4">
+                    <div class="flex items-center gap-1.5">
+                      <component :is="getPaymentIcon(order.payment)" class="w-4 h-4 text-gray-400" />
+                      <span class="capitalize">{{ order.payment }}</span>
+                    </div>
+                  </td>
+                  <td class="py-4 px-4">{{ order.items }}</td>
+                  <td class="py-4 px-4 font-medium text-[#3b82f6]">Rs. {{ order.total.toLocaleString() }}</td>
+                  <td class="py-4 px-4">
+                    <div class="flex items-center justify-center gap-2">
+                      <button @click="viewOrderDetails(order)"
+                        class="p-1.5 hover:bg-[#334155] rounded-lg transition-colors group" title="View Details"
+                        aria-label="View order details">
+                        <Eye class="w-4 h-4 text-blue-400 group-hover:text-blue-300" />
+                      </button>
+                      <button @click="openUpdateModal(order)"
+                        class="p-1.5 hover:bg-[#334155] rounded-lg transition-colors group" title="Edit Order"
+                        aria-label="Edit order">
+                        <Edit class="w-4 h-4 text-yellow-400 group-hover:text-yellow-300" />
+                      </button>
+                      <button @click="openReturnModal(order)"
+                        class="p-1.5 hover:bg-[#334155] rounded-lg transition-colors group" title="Return Order"
+                        aria-label="Return order">
+                        <RotateCcw class="w-4 h-4 text-purple-400 group-hover:text-purple-300" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <!-- Second table: orders after 10th -->
+            <table v-if="secondTableOrders.length > 0" class="w-full min-w-[800px] mt-8">
+              <thead>
+                <tr class="bg-gradient-to-r from-[#1e293b]/70 to-[#1e293b]/50 text-gray-400 text-sm">
+                  <th class="py-3 px-4 text-left">
+                    <div class="flex items-center">
+                      <input type="checkbox" @change="selectAllOrders"
+                        :checked="selectedOrders.length === paginatedOrders.length && paginatedOrders.length > 0"
+                        class="rounded border-gray-600 text-[#3b82f6] focus:ring-[#3b82f6]/30 bg-gray-700 w-4 h-4"
+                        aria-label="Select all orders" />
+                    </div>
+                  </th>
+                  <th class="py-3 px-4 text-left">
+                    <button @click="toggleSort('id')" class="flex items-center gap-1 hover:text-white transition-colors"
+                      aria-label="Sort by Order ID">
+                      Order ID
+                      <ArrowUpDown class="w-4 h-4" :class="{ 'text-[#3b82f6]': sortField === 'id' }" />
+                    </button>
+                  </th>
+                  <th class="py-3 px-4 text-left">
+                    <button @click="toggleSort('customer')"
+                      class="flex items-center gap-1 hover:text-white transition-colors" aria-label="Sort by Customer">
+                      Customer
+                      <ArrowUpDown class="w-4 h-4" :class="{ 'text-[#3b82f6]': sortField === 'customer' }" />
+                    </button>
+                  </th>
+                  <th class="py-3 px-4 text-left">
+                    <button @click="toggleSort('date')"
+                      class="flex items-center gap-1 hover:text-white transition-colors" aria-label="Sort by Date">
+                      Date & Time
+                      <ArrowUpDown class="w-4 h-4" :class="{ 'text-[#3b82f6]': sortField === 'date' }" />
+                    </button>
+                  </th>
+                  <th class="py-3 px-4 text-left">Payment</th>
+                  <th class="py-3 px-4 text-left">
+                    <button @click="toggleSort('items')"
+                      class="flex items-center gap-1 hover:text-white transition-colors" aria-label="Sort by Items">
+                      Items
+                      <ArrowUpDown class="w-4 h-4" :class="{ 'text-[#3b82f6]': sortField === 'items' }" />
+                    </button>
+                  </th>
+                  <th class="py-3 px-4 text-left">
+                    <button @click="toggleSort('total')"
+                      class="flex items-center gap-1 hover:text-white transition-colors" aria-label="Sort by Total">
+                      Total
+                      <ArrowUpDown class="w-4 h-4" :class="{ 'text-[#3b82f6]': sortField === 'total' }" />
+                    </button>
+                  </th>
+                  <th class="py-3 px-4 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="order in secondTableOrders" :key="order.id"
                   class="border-t border-[#334155]/30 hover:bg-[#1e293b]/50 transition-colors duration-200">
                   <td class="py-4 px-4">
                     <input type="checkbox" :checked="selectedOrders.includes(order.id)"
@@ -1617,47 +1766,16 @@ const calculateTotal = (order) => {
             </button>
           </div>
 
-          <!-- Basic Order Info -->
+          <!-- Order Meta Info -->
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div class="space-y-4">
+            <div class="space-y-3">
               <div>
-                <label class="flex items-center gap-2 text-sm text-gray-400">
-                  Customer Information
-                  <span v-if="!currentOrderDetail.customer_id" 
-                    class="px-1.5 py-0.5 text-[10px] font-medium bg-yellow-500/20 text-yellow-400 rounded-full">
-                    WALK-IN CUSTOMER
-                  </span>
-                </label>
-                <div class="mt-2 flex items-center gap-2">
-                  <div class="w-8 h-8 rounded-full flex items-center justify-center"
-                    :class="{
-                      'bg-[#3b82f6]/20 text-[#3b82f6]': currentOrderDetail.customer_id,
-                      'bg-yellow-500/20 text-yellow-400': !currentOrderDetail.customer_id
-                    }">
-                    <User class="w-4 h-4" />
-                  </div>
-                  <div class="flex flex-col">
-                    <span class="text-white">
-                      {{ currentOrderDetail.customer ? currentOrderDetail.customer.name : 'Walk-in Customer' }}
-                    </span>
-                    <span class="text-sm text-gray-400">
-                      {{ currentOrderDetail.customer ? currentOrderDetail.customer.email : 'No customer account' }}
-                    </span>
-                  </div>
-                </div>
-
-                <div v-if="!currentOrderDetail.customer_id" 
-                  class="mt-3 p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
-                  <div class="flex items-start gap-2">
-                    <AlertCircle class="w-5 h-5 text-yellow-400 mt-0.5" />
-                    <div class="flex-1">
-                      <p class="text-sm text-yellow-400 font-medium">Walk-in Customer Order</p>
-                      <p class="text-xs text-gray-400 mt-1">
-                        This order was created for a walk-in customer without a registered account.
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                <span class="text-gray-400">Order ID:</span>
+                <span class="ml-2 text-white">{{ currentOrderDetail.id }}</span>
+              </div>
+              <div v-if="currentOrderDetail.invoice">
+                <span class="text-gray-400">Invoice:</span>
+                <span class="ml-2 text-white">{{ currentOrderDetail.invoice }}</span>
               </div>
               <div>
                 <span class="text-gray-400">Date:</span>
@@ -1667,67 +1785,114 @@ const calculateTotal = (order) => {
                 <span class="text-gray-400">Time:</span>
                 <span class="ml-2">{{ formatTime(currentOrderDetail.date) }}</span>
               </div>
-            </div>
-            <div class="space-y-4">
-              <div>
-                <span class="text-gray-400">Payment Method:</span>
-                <div class="mt-2 flex items-center gap-2">
-                  <component 
-                    :is="getPaymentIcon(currentOrderDetail.payment)" 
-                    class="w-5 h-5 text-purple-400"
-                  />
-                  <span class="capitalize">{{ currentOrderDetail.payment }}</span>
-                </div>
-              </div>
               <div>
                 <span class="text-gray-400">Status:</span>
-                <div class="mt-2 flex items-center gap-2">
-                  <component 
-                    :is="getStatusIcon(currentOrderDetail.status)" 
-                    class="w-5 h-5"
-                    :class="{
-                      'text-emerald-400': currentOrderDetail.status === 'completed',
-                      'text-yellow-400': currentOrderDetail.status === 'pending',
-                      'text-red-400': currentOrderDetail.status === 'cancelled'
-                    }"
-                  />
-                  <span class="capitalize">{{ currentOrderDetail.status }}</span>
-                </div>
+                <span class="ml-2 capitalize text-white">{{ currentOrderDetail.status }}</span>
               </div>
               <div>
-                <span class="text-gray-400">Total Amount:</span>
-                <div class="mt-2 text-lg font-bold text-blue-400">
-                  Rs. {{ currentOrderDetail.total.toLocaleString() }}
-                </div>
+                <span class="text-gray-400">Payment Method:</span>
+                <span class="ml-2 capitalize text-white">{{ currentOrderDetail.payment }}</span>
+              </div>
+              <div v-if="currentOrderDetail.payment_status">
+                <span class="text-gray-400">Payment Status:</span>
+                <span class="ml-2 text-white">{{ currentOrderDetail.payment_status }}</span>
+              </div>
+              <div v-if="currentOrderDetail.advance_amount">
+                <span class="text-gray-400">Advance Paid:</span>
+                <span class="ml-2 text-white">Rs. {{ currentOrderDetail.advance_amount }}</span>
+              </div>
+              <div v-if="currentOrderDetail.remaining_balance">
+                <span class="text-gray-400">Remaining Balance:</span>
+                <span class="ml-2 text-white">Rs. {{ currentOrderDetail.remaining_balance }}</span>
+              </div>
+              <!-- Add discount display here -->
+              <div v-if="currentOrderDetail.discount">
+                <span class="text-gray-400">Discount:</span>
+                <span class="ml-2 text-white">{{ currentOrderDetail.discount }}%</span>
+              </div>
+            </div>
+            <div class="space-y-3">
+              <div>
+                <span class="text-gray-400">Customer ID:</span>
+                <span class="ml-2 text-white">{{ currentOrderDetail.customer_id || 'Walk-in' }}</span>
+              </div>
+              <div>
+                <span class="text-gray-400">Customer Name:</span>
+                <span class="ml-2 text-white">{{ currentOrderDetail.customer?.name || 'Walk-in Customer' }}</span>
+              </div>
+              <div v-if="currentOrderDetail.customer?.email">
+                <span class="text-gray-400">Email:</span>
+                <span class="ml-2 text-white">{{ currentOrderDetail.customer.email }}</span>
+              </div>
+              <div v-if="currentOrderDetail.customer?.phone">
+                <span class="text-gray-400">Phone:</span>
+                <span class="ml-2 text-white">{{ currentOrderDetail.customer.phone }}</span>
+              </div>
+              <div>
+                <span class="text-gray-400">Cashier ID:</span>
+                <span class="ml-2 text-white">{{ currentOrderDetail.cashier_id }}</span>
+              </div>
+              <div v-if="currentOrderDetail.cart_discount">
+                <span class="text-gray-400">Cart Discount:</span>
+                <span class="ml-2 text-white">{{ currentOrderDetail.cart_discount }}%</span>
+              </div>
+              <div v-if="currentOrderDetail.product_discounts_total">
+                <span class="text-gray-400">Product Discounts Total:</span>
+                <span class="ml-2 text-white">Rs. {{ currentOrderDetail.product_discounts_total }}</span>
+              </div>
+              <div v-if="currentOrderDetail.total_discount_amount">
+                <span class="text-gray-400">Total Discount Amount:</span>
+                <span class="ml-2 text-white">Rs. {{ currentOrderDetail.total_discount_amount }}</span>
               </div>
             </div>
           </div>
 
+          <!-- Check Payment Details -->
+          <div v-if="currentOrderDetail.payment === 'CHECK' && currentOrderDetail.check_details" class="mb-6">
+            <h3 class="text-sm font-medium text-gray-400 mb-2">Check Payment Details</h3>
+            <div class="bg-[#1e293b] rounded-lg p-4 border border-[#334155] space-y-2">
+              <div><span class="text-gray-400">Bank Name:</span> <span class="ml-2 text-white">{{ currentOrderDetail.check_details.bankName || currentOrderDetail.check_details.bank_name }}</span></div>
+              <div><span class="text-gray-400">Check Number:</span> <span class="ml-2 text-white">{{ currentOrderDetail.check_details.checkNumber || currentOrderDetail.check_details.check_number }}</span></div>
+              <div><span class="text-gray-400">Check Date:</span> <span class="ml-2 text-white">{{ currentOrderDetail.check_details.checkDate || currentOrderDetail.check_details.check_date }}</span></div>
+              <div><span class="text-gray-400">Amount:</span> <span class="ml-2 text-white">Rs. {{ currentOrderDetail.check_details.amount }}</span></div>
+              <div v-if="currentOrderDetail.check_details.remarks"><span class="text-gray-400">Remarks:</span> <span class="ml-2 text-white">{{ currentOrderDetail.check_details.remarks }}</span></div>
+            </div>
+          </div>
+
           <!-- Order Items Table -->
-          <div class="bg-[#1e293b] rounded-lg p-4 border border-[#334155]">
+          <div class="bg-[#1e293b] rounded-lg p-4 border border-[#334155] mb-6">
             <h3 class="font-medium mb-4">Order Items</h3>
             <div class="overflow-x-auto">
-              <table class="w-full min-w-[500px]">
+              <table class="w-full min-w-[900px]">
                 <thead>
                   <tr class="text-gray-400 text-sm border-b border-[#334155]">
                     <th class="py-2 px-4 text-left">Product Name</th>
-                    <th class="py-2 px-4 text-left">Description</th>
                     <th class="py-2 px-4 text-center">Quantity</th>
                     <th class="py-2 px-4 text-right">Unit Price</th>
                     <th class="py-2 px-4 text-right">Total</th>
+                    <th class="py-2 px-4 text-center">Width (in)</th>
+                    <th class="py-2 px-4 text-center">Height (in)</th>
+                    <th class="py-2 px-4 text-center">Area (sqm)</th>
+                    <th class="py-2 px-4 text-left">Special Note</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-if="currentOrderDetail.products.length === 0">
-                    <td colspan="5" class="py-4 text-center text-gray-500">No items in this order</td>
+                    <td colspan="8" class="py-4 text-center text-gray-500">No items in this order</td>
                   </tr>
                   <tr v-for="product in currentOrderDetail.products" :key="product.id"
                     class="border-b border-[#334155]/50">
                     <td class="py-3 px-4">{{ product.name }}</td>
-                    <td class="py-3 px-4 text-gray-400">{{ product.description || 'No description available' }}</td>
                     <td class="py-3 px-4 text-center">{{ product.quantity }}</td>
                     <td class="py-3 px-4 text-right">Rs. {{ product.price.toLocaleString() }}</td>
                     <td class="py-3 px-4 text-right font-medium">Rs. {{ product.total.toLocaleString() }}</td>
+                    <td class="py-3 px-4 text-center">{{ product.width_inch ?? product.width ?? '-' }}</td>
+                    <td class="py-3 px-4 text-center">{{ product.height_inch ?? product.height ?? '-' }}</td>
+                    <td class="py-3 px-4 text-center">{{ product.area_sqm ?? product.area ?? '-' }}</td>
+                    <td class="py-3 px-4 text-left">
+                      <span v-if="product.special_note && product.special_note.trim() !== ''">{{ product.special_note }}</span>
+                      <span v-else class="text-gray-400">-</span>
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -1735,16 +1900,13 @@ const calculateTotal = (order) => {
           </div>
 
           <!-- Order Summary -->
-          <div class="mt-8 bg-[#1e293b] rounded-lg border border-[#334155] p-4">
+          <div class="bg-[#1e293b] rounded-lg border border-[#334155] p-4 mb-6">
             <h3 class="text-sm font-medium text-gray-400 mb-4">Order Summary</h3>
             <div class="space-y-3">
-              <!-- Subtotal -->
               <div class="flex justify-between items-center pb-3 border-b border-[#334155]/50">
                 <span class="text-gray-400">Subtotal</span>
                 <span class="text-white font-medium">Rs. {{ currentOrderDetail.subtotal?.toLocaleString() }}</span>
               </div>
-              
-              <!-- Discount -->
               <div v-if="currentOrderDetail.discount > 0" 
                   class="flex justify-between items-center pb-3 border-b border-[#334155]/50">
                 <div class="flex items-center gap-2">
@@ -1757,8 +1919,6 @@ const calculateTotal = (order) => {
                   -Rs. {{ ((currentOrderDetail.subtotal * currentOrderDetail.discount) / 100).toLocaleString() }}
                 </span>
               </div>
-              
-              <!-- Total -->
               <div class="flex justify-between items-center pt-2">
                 <span class="text-lg font-medium text-white">Total Amount</span>
                 <span class="text-lg font-bold text-blue-400">
@@ -1832,8 +1992,9 @@ const calculateTotal = (order) => {
               <select v-model="editingOrder.payment"
                 class="bg-[#1e293b] border border-[#334155] rounded-lg px-4 py-2.5 w-full focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/30 text-white">
                 <option value="CASH">Cash</option>
-                <option value="CREDIT_CARD">Credit Card</option>
-                <option value="DEBIT_CARD">Debit Card</option>
+                <option value="CARD">Card</option>
+                <option value="CHECK">Check</option>
+                <option value="ONLINE">Online</option>
               </select>
             </div>
 
@@ -1861,59 +2022,104 @@ const calculateTotal = (order) => {
             </div>
           </div>
 
+          <!-- Updated Order Items Table -->
           <div class="border-t border-[#334155] pt-6">
-            <h3 class="text-sm text-gray-400 mb-3 font-medium">Order Items</h3>
-            <div class="space-y-3 max-h-[200px] overflow-y-auto custom-scrollbar pr-2">
-              <div v-for="(product, index) in editingOrder.products" :key="index"
-                class="flex items-center gap-4 bg-[#1e293b] p-3 rounded-lg border border-[#334155]">
-                <div class="w-32">
-                  <label class="text-xs text-gray-400 mb-1 block">Product ID</label>
-                  <input 
-                    type="text" 
-                    v-model="product.id"
-                    class="bg-[#1e293b] border border-[#334155] rounded-lg px-3 py-1.5 w-full focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/30 text-white text-sm"
-                    placeholder="Product ID"
-                  >
-                </div>
-                <div class="flex-1">
-                  <label class="text-xs text-gray-400 mb-1 block">Product Name</label>
-                  <input 
-                    type="text"
-                    v-model="product.name"
-                    readonly
-                    class="bg-[#1e293b]/50 border border-[#334155] rounded-lg px-3 py-1.5 w-full focus:outline-none text-gray-400 text-sm cursor-not-allowed"
-                    placeholder="Product name"
-                  >
-                </div>
-                <div class="w-24">
-                  <label class="text-xs text-gray-400 mb-1 block">Quantity</label>
-                  <input 
-                    type="number"
-                    v-model="product.quantity"
-                    min="1"
-                    class="bg-[#1e293b] border border-[#334155] rounded-lg px-3 py-1.5 w-full focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/30 text-white text-sm"
-                    placeholder="Qty"
-                  >
-                </div>
-                <div class="w-32">
-                  <label class="text-xs text-gray-400 mb-1 block">Price</label>
-                  <input 
-                    type="number"
-                    v-model="product.price"
-                    min="0"
-                    class="bg-[#1e293b] border border-[#334155] rounded-lg px-3 py-1.5 w-full focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/30 text-white text-sm"
-                    placeholder="Price"
-                  >
-                </div>
-                <div class="pt-5">
-                  <button 
-                    @click="editingOrder.products.splice(index, 1)"
-                    class="p-1.5 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors"
-                  >
-                    <X class="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
+            <h3 class="text-sm font-medium text-gray-400 mb-3">Order Items</h3>
+            <div class="overflow-x-auto">
+              <table class="w-full min-w-[900px]">
+                <thead>
+                  <tr class="text-gray-400 text-sm border-b border-[#334155]">
+                    <th class="py-2 px-4 text-left">Product Name</th>
+                    <th class="py-2 px-4 text-center">Quantity</th>
+                    <th class="py-2 px-4 text-right">Unit Price</th>
+                    <th class="py-2 px-4 text-right">Total</th>
+                    <th class="py-2 px-4 text-center">Width (in)</th>
+                    <th class="py-2 px-4 text-center">Height (in)</th>
+                    <th class="py-2 px-4 text-center">Area (sqm)</th>
+                    <th class="py-2 px-4 text-left">Special Note</th> <!-- Add this column -->
+                    <th class="py-2 px-4 text-center">Remove</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(product, index) in editingOrder.products" :key="index"
+                    class="border-b border-[#334155]/50">
+                    <td class="py-3 px-4">
+                      <input 
+                        type="text"
+                        v-model="product.name"
+                        readonly
+                        class="bg-[#1e293b]/50 border border-[#334155] rounded-lg px-3 py-1.5 w-full focus:outline-none text-gray-400 text-sm cursor-not-allowed"
+                        placeholder="Product name"
+                      >
+                    </td>
+                    <td class="py-3 px-4 text-center">
+                      <input 
+                        type="number"
+                        v-model="product.quantity"
+                        min="1"
+                        class="bg-[#1e293b] border border-[#334155] rounded-lg px-3 py-1.5 w-20 focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/30 text-white text-sm"
+                        placeholder="Qty"
+                      >
+                    </td>
+                    <td class="py-3 px-4 text-right">
+                      <input 
+                        type="number"
+                        v-model="product.price"
+                        min="0"
+                        class="bg-[#1e293b] border border-[#334155] rounded-lg px-3 py-1.5 w-24 focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/30 text-white text-sm"
+                        placeholder="Price"
+                      >
+                    </td>
+                    <td class="py-3 px-4 text-right font-medium">
+                      Rs. {{ (product.price * product.quantity).toLocaleString() }}
+                    </td>
+                    <td class="py-3 px-4 text-center">
+                      <input 
+                        type="number"
+                        v-model="product.width_inch"
+                        min="0"
+                        class="bg-[#1e293b] border border-[#334155] rounded-lg px-2 py-1 w-20 focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/30 text-white text-sm"
+                        placeholder="Width"
+                      >
+                    </td>
+                    <td class="py-3 px-4 text-center">
+                      <input 
+                        type="number"
+                        v-model="product.height_inch"
+                        min="0"
+                        class="bg-[#1e293b] border border-[#334155] rounded-lg px-2 py-1 w-20 focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/30 text-white text-sm"
+                        placeholder="Height"
+                      >
+                    </td>
+                    <td class="py-3 px-4 text-center">
+                      <input 
+                        type="number"
+                        v-model="product.area_sqm"
+                        min="0"
+                        class="bg-[#1e293b] border border-[#334155] rounded-lg px-2 py-1 w-24 focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/30 text-white text-sm"
+                        placeholder="Area"
+                      >
+                    </td>
+                    <td class="py-3 px-4 text-left">
+                      <input
+                        type="text"
+                        v-model="product.special_note"
+                        class="bg-[#1e293b] border border-[#334155] rounded-lg px-3 py-1.5 w-full focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/30 text-white text-sm"
+                        placeholder="Special note"
+                      >
+                    </td>
+                    <td class="py-3 px-4 text-center">
+                      <button 
+                        @click="editingOrder.products.splice(index, 1)"
+                        class="p-1.5 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors"
+                        title="Remove item"
+                      >
+                        <X class="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
 
@@ -1996,6 +2202,7 @@ const calculateTotal = (order) => {
                           :max="item.max_quantity"
                           min="0"
                           :class="[
+
                             'w-full bg-[#1e293b] border rounded-lg pl-3 pr-10 py-2.5 text-sm transition-all duration-300',
                             !item.quantity ? 'border-[#334155] focus:border-[#3b82f6] text-white' : '',
                             item.quantity && validateReturnQuantity(item).valid ? 'border-emerald-500/50 text-emerald-400' : '',
@@ -2007,6 +2214,7 @@ const calculateTotal = (order) => {
                             :is="item.quantity ? (validateReturnQuantity(item).valid ? CheckCircle : XCircle) : AlertCircle"
                             class="w-4 h-4"
                             :class="[
+
                               !item.quantity ? 'text-gray-500' : '',
                               item.quantity && validateReturnQuantity(item).valid ? 'text-emerald-400' : '',
                               item.quantity && !validateReturnQuantity(item).valid ? 'text-red-400' : ''

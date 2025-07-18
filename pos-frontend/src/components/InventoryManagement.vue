@@ -167,7 +167,6 @@ const chartOptions = {
         label: (context) => `${context.dataset.label}: ${context.parsed.y.toLocaleString()} units`,
       },
     },
-    title: { display: true, text: 'Stock Distribution by Location', color: '#e5e7eb', font: { size: 16, weight: 'bold' }, padding: { top: 10, bottom: 20 } },
   },
   scales: {
     y: { beginAtZero: true, grid: { color: 'rgba(75, 85, 99, 0.2)', drawBorder: false }, ticks: { color: '#9ca3af', font: { size: 11 }, callback: (value) => `${value.toLocaleString()} units` }, title: { display: true, text: 'Stock Quantity', color: '#9ca3af', font: { size: 12 } } },
@@ -205,6 +204,7 @@ const paginatedInventory = computed(() => {
 
 const totalPages = computed(() => Math.ceil(filteredInventory.value.length / itemsPerPage.value));
 const lowStockItems = computed(() => inventory.value.filter((item) => item.quantity < 20 && item.quantity > 0));
+const outOfStockItems = computed(() => inventory.value.filter((item) => item.quantity === 0));
 const totalItems = computed(() => inventory.value.reduce((sum, item) => sum + item.quantity, 0));
 
 // Updated inventoryValue to use the same calculation logic as calculateStockValue
@@ -290,6 +290,13 @@ const fetchInventory = async () => {
         price: item.product.price,
         supplier_id: item.product.supplier_id,
         inventory_id: item.product.inventory_id,
+        image_url: item.product.image_url, // Add image
+        supplier: item.product.supplier ? {
+          id: item.product.supplier.id,
+          name: item.product.supplier.name,
+          email: item.product.supplier.email,
+          contact: item.product.supplier.contact,
+        } : null,
       } : null,
     }));
   } catch (error) {
@@ -354,10 +361,10 @@ const saveNewProduct = async () => {
     }
     const payload = {
       name: newProduct.value.name.trim(),
-      model: newProduct.value.model.trim(),
+      model: newProduct.value.model.trim(), // Ensure model is sent
       price: parseFloat(newProduct.value.price) || 0,
       supplier_id: parseInt(newProduct.value.supplier_id),
-      inventory_id: newlyAddedInventoryId.value, // <-- Add this line
+      inventory_id: newlyAddedInventoryId.value,
     };
 
     const response = await connection.post('/products', payload);
@@ -371,6 +378,7 @@ const saveNewProduct = async () => {
 
     grnProductData.value = {
       name: newProduct.value.name,
+      model: newProduct.value.model, // Pass model to GRN report
       description: newProduct.value.description,
       quantity: newItem.value.quantity,
       price: parseFloat(newProduct.value.price),
@@ -406,6 +414,9 @@ const saveNewProduct = async () => {
       background: '#1e293b',
       color: '#ffffff'
     });
+
+    // Show payment modal after product is added
+    showPaymentModal.value = true;
 
     showMultiStepModal.value = false;
     currentStep.value = 1;
@@ -808,6 +819,163 @@ const FormLabel = {
     return () => h('label', { class: 'form-label' }, slots.default());
   }
 };
+
+const showReturnModal = ref(false);
+const returnDetails = ref({
+  quantity: 1,
+  reason: '',
+  returned_by: '',
+});
+
+const openReturnModal = (item) => {
+  selectedItem.value = item;
+  returnDetails.value = {
+    quantity: 1,
+    reason: '',
+    returned_by: '',
+  };
+  showReturnModal.value = true;
+};
+
+const closeReturnModal = () => {
+  showReturnModal.value = false;
+  selectedItem.value = null;
+};
+
+const isReturning = ref(false);
+const submitReturn = async () => {
+  if (!selectedItem.value || !returnDetails.value.quantity) {
+    showNotification('Please enter a valid quantity', 'error');
+    return;
+  }
+  isReturning.value = true;
+  try {
+    const payload = {
+      product_id: selectedItem.value.product.id,
+      inventory_id: selectedItem.value.id,
+      supplier_id: selectedItem.value.product.supplier_id,
+      quantity: returnDetails.value.quantity,
+      reason: returnDetails.value.reason,
+      returned_by: returnDetails.value.returned_by,
+    };
+    const response = await connection.post('/product-returns', payload);
+    if (response.data.status === 'success') {
+      // Update inventory locally
+      const idx = inventory.value.findIndex(i => i.id === selectedItem.value.id);
+      if (idx !== -1) {
+        inventory.value[idx].quantity -= returnDetails.value.quantity;
+        // Set status to "Out Of Stock" if quantity is zero
+        inventory.value[idx].status = inventory.value[idx].quantity === 0
+          ? 'Out Of Stock'
+          : inventory.value[idx].quantity < 20
+            ? 'Low Stock'
+            : 'In Stock';
+      }
+      await Swal.fire({
+        icon: 'success',
+        title: 'Product Returned Successfully!',
+        text: 'Return details have been saved.',
+        background: '#1e293b',
+        color: '#ffffff',
+        timer: 1500,
+        showConfirmButton: false,
+      });
+      closeReturnModal();
+    } else {
+      throw new Error(response.data.message || 'Failed to return product');
+    }
+  } catch (error) {
+    showNotification('Failed to process return', 'error');
+    console.error('Return error:', error);
+  } finally {
+    isReturning.value = false;
+  }
+};
+
+// Add new computed for Top 5 Products by Quantity
+const topProductsChartData = computed(() => {
+  // Sort inventory by quantity descending, take top 5
+  const topItems = [...inventory.value]
+    .filter(item => item.product && typeof item.quantity === 'number')
+    .sort((a, b) => b.quantity - a.quantity)
+    .slice(0, 5);
+
+  return {
+    labels: topItems.map(item => item.product.name || `ID ${item.id}`),
+    datasets: [
+      {
+        label: 'Quantity',
+        data: topItems.map(item => item.quantity),
+        backgroundColor: [
+          'rgba(34,197,94,0.7)',
+          'rgba(99,102,241,0.7)',
+          'rgba(251,191,36,0.7)',
+          'rgba(239,68,68,0.7)',
+          'rgba(59,130,246,0.7)'
+        ],
+        borderColor: [
+          'rgba(34,197,94,1)',
+          'rgba(99,102,241,1)',
+          'rgba(251,191,36,1)',
+          'rgba(239,68,68,1)',
+          'rgba(59,130,246,1)'
+        ],
+        borderWidth: 2,
+        borderRadius: 6,
+      }
+    ]
+  };
+});
+
+// Payment modal state and data
+const showPaymentModal = ref(false);
+const paymentDetails = ref({
+  amount: '',
+  payment_method: 'cash',
+  check_number: '',
+  notes: ''
+});
+const isPayingSupplier = ref(false);
+
+// Show payment modal after product is added
+const openPaymentModal = (product, inventory) => {
+  paymentDetails.value = {
+    amount: product.price || '',
+    payment_method: 'cash',
+    check_number: '',
+    notes: ''
+  };
+  showPaymentModal.value = true;
+};
+
+// Handle payment submission
+const submitSupplierPayment = async () => {
+  if (!grnProductData.value || !grnProductData.value.supplier_id || !grnProductData.value.name) {
+    showNotification('Missing supplier or product info', 'error');
+    return;
+  }
+  isPayingSupplier.value = true;
+  try {
+    const payload = {
+      supplier_id: grnProductData.value.supplier_id,
+      product_id: grnProductData.value.inventory_id ? null : grnProductData.value.id, // fallback
+      inventory_id: grnProductData.value.inventory_id,
+      admin_id: grnProductData.value.admin_id || 1, // Replace with actual admin id if available
+      amount: paymentDetails.value.amount,
+      payment_method: paymentDetails.value.payment_method,
+      check_number: paymentDetails.value.payment_method === 'check' ? paymentDetails.value.check_number : null,
+      notes: paymentDetails.value.notes
+    };
+    await connection.post('/supplier-payments', payload);
+    showNotification('Supplier payment recorded successfully', 'success');
+    showPaymentModal.value = false;
+  } catch (error) {
+    showNotification('Failed to record supplier payment', 'error');
+  } finally {
+    isPayingSupplier.value = false;
+  }
+};
+
 </script>
 
 <template>
@@ -928,6 +1096,11 @@ const FormLabel = {
                         title="Delete Item">
                         <TrashIcon class="h-4 w-4" />
                       </button>
+                      <button @click="openReturnModal(item)"
+                        class="bg-yellow-500/20 p-1.5 rounded text-yellow-400 duration-200 hover:bg-yellow-500/30 transition-colors"
+                        title="Return Product">
+                        <ArrowLeftIcon class="h-4 w-4" />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -961,26 +1134,26 @@ const FormLabel = {
         </div>
 
         <div class="flex flex-col w-full gap-6 lg:w-1/3">
+          <!-- Replace Inventory by Category chart with Top 5 Products by Quantity -->
           <div class="bg-gray-800/80 border border-gray-700/50 p-6 rounded-xl shadow-xl overflow-hidden">
             <div class="mb-4">
-              <h2 class="text-white text-xl font-bold">Inventory by Category</h2>
-              <p class="text-gray-400 text-sm">Distribution of items across categories</p>
+              <h2 class="text-white text-xl font-bold">Top 5 Products by Quantity</h2>
+              <p class="text-gray-400 text-sm">Products with the highest stock</p>
             </div>
             <div class="h-[300px]">
-              <Bar :data="inventoryChartData" :options="chartOptions" />
+              <Bar :data="topProductsChartData" :options="chartOptions" />
             </div>
           </div>
           <div class="bg-gray-800/80 border border-gray-700/50 p-6 rounded-xl shadow-xl overflow-hidden">
             <div class="flex justify-between items-center mb-4">
               <div>
-                <h2 class="text-white text-xl font-bold">Low Stock Items</h2>
-                <p class="text-gray-400 text-sm">Items below threshold level</p>
-              </div><span class="bg-amber-500/20 rounded-full text-amber-400 text-sm px-2 py-1">{{ lowStockItems.length
-                }}
-                items</span>
+                <h2 class="text-white text-xl font-bold">Out of Stock Items</h2>
+                <p class="text-gray-400 text-sm">Items with zero quantity</p>
+              </div>
+              <span class="bg-red-500/20 rounded-full text-red-400 text-sm px-2 py-1">{{ outOfStockItems.length }} items</span>
             </div>
-            <div v-if="lowStockItems.length > 0" class="custom-scrollbar max-h-[240px] overflow-y-auto pr-1 space-y-3">
-              <div v-for="(item, index) in lowStockItems" :key="item.id"
+            <div v-if="outOfStockItems.length > 0" class="custom-scrollbar max-h-[240px] overflow-y-auto pr-1 space-y-3">
+              <div v-for="(item, index) in outOfStockItems" :key="item.id"
                 class="flex bg-red-500/10 border border-red-500/20 justify-between p-3 rounded-lg items-center"
                 :class="{ 'animate-fade-in': index < 3 }">
                 <div>
@@ -999,12 +1172,12 @@ const FormLabel = {
                 </div>
                 <div class="text-right">
                   <div class="text-red-400 font-bold">{{ item.quantity }}</div>
-                  <div class="text-gray-400 text-xs">In stock</div>
+                  <div class="text-gray-400 text-xs">Out of stock</div>
                 </div>
               </div>
             </div>
             <div v-else class="text-center text-gray-400 py-6">
-              <p>No low stock items! 🎉</p>
+              <p>No out of stock items! 🎉</p>
             </div>
           </div>
           <div class="bg-gray-800/80 border border-gray-700/50 p-6 rounded-xl shadow-xl overflow-hidden">
@@ -1058,14 +1231,12 @@ const FormLabel = {
         class="bg-gradient-to-br border border-gray-700/50 p-6 rounded-2xl shadow-2xl w-full animate-fade-in from-gray-900/95 max-w-lg to-gray-800/95">
         <div class="flex justify-between items-start mb-8">
           <div class="flex gap-4 items-center">
-            <div
-              :class="['p-3 rounded-xl shadow-lg border border-opacity-50 transition-colors', stockAdjustment.quantity >= 0 ? 'bg-gradient-to-br from-emerald-600/10 to-emerald-700/10 border-emerald-500/20' : 'bg-gradient-to-br from-red-600/10 to-red-700/10 border-red-500/20']">
-              <ArrowPathIcon class="h-6 w-6"
-                :class="stockAdjustment.quantity >= 0 ? 'text-emerald-400' : 'text-red-400'" />
+            <div class="p-3 rounded-xl shadow-lg border border-opacity-50 bg-gradient-to-br from-emerald-600/10 to-emerald-700/10 border-emerald-500/20">
+              <ArrowPathIcon class="h-6 text-emerald-400 w-6" />
             </div>
             <div>
               <h2 class="text-2xl text-white font-bold mb-1">Stock Adjustment</h2>
-              <p class="text-gray-400 text-sm">Update inventory quantities</p>
+              <p class="text-gray-400 text-sm">Add inventory quantities</p>
             </div>
           </div>
           <button @click="closeStockModal" class="p-2 rounded-lg duration-200 hover:bg-gray-700/50 transition-colors">
@@ -1076,65 +1247,57 @@ const FormLabel = {
           <div class="bg-gradient-to-br border border-gray-700/50 p-5 rounded-xl from-gray-800 to-gray-800/50">
             <div class="flex justify-between items-center mb-4">
               <div class="flex gap-2 items-center">
-                <ArchiveBoxIcon class="h-5 text-gray-400 w-5" /><span class="text-gray-400">Item #{{ selectedItem.id
-                  }}</span>
-              </div><span
-                :class="{ 'px-3 py-1 rounded-full text-xs font-medium': true, 'bg-emerald-500/20 text-emerald-400': selectedItem.status === 'In Stock', 'bg-yellow-500/20 text-yellow-400': selectedItem.status === 'Low Stock', 'bg-red-500/20 text-red-400': selectedItem.status === 'Out Of Stock' }">{{
-                selectedItem.status }}</span>
+                <ArchiveBoxIcon class="h-5 text-gray-400 w-5" /><span class="text-gray-400">Item #{{ selectedItem.id }}</span>
+              </div>
+              <span :class="{ 'px-3 py-1 rounded-full text-xs font-medium': true, 'bg-emerald-500/20 text-emerald-400': selectedItem.status === 'In Stock', 'bg-yellow-500/20 text-yellow-400': selectedItem.status === 'Low Stock', 'bg-red-500/20 text-red-400': selectedItem.status === 'Out Of Stock' }">{{ selectedItem.status }}</span>
             </div>
             <div class="grid grid-cols-2 gap-6">
-              <div><span class="text-gray-400 text-sm">Current Stock</span>
+              <div>
+                <span class="text-gray-400 text-sm">Current Stock</span>
                 <div class="text-3xl text-white font-bold mt-1">{{ selectedItem.quantity }}</div>
               </div>
-              <div class="text-right"><span class="text-gray-400 text-sm">Location</span>
+              <div class="text-right">
+                <span class="text-gray-400 text-sm">Location</span>
                 <div class="text-lg text-white font-medium mt-1">{{ selectedItem.location }}</div>
               </div>
             </div>
           </div>
           <div class="space-y-5">
-            <div><label class="flex justify-between items-center mb-2"><span
-                  class="text-gray-300 font-medium">Adjustment
-                  Amount</span><span
-                  :class="{ 'text-sm font-medium': true, 'text-emerald-400': stockAdjustment.quantity > 0, 'text-red-400': stockAdjustment.quantity < 0, 'text-gray-400': stockAdjustment.quantity === 0 }">New
-                  Total: {{ Math.max(0, selectedItem.quantity + stockAdjustment.quantity) }}</span></label>
+            <div>
+              <label class="flex justify-between items-center mb-2">
+                <span class="text-gray-300 font-medium">Adjustment Amount</span>
+                <span class="text-sm font-medium text-emerald-400">New Total: {{ selectedItem.quantity + Math.max(0, stockAdjustment.quantity) }}</span>
+              </label>
               <div class="flex gap-3 items-center">
-                <button
-                  @click="stockAdjustment.quantity = Math.max(-selectedItem.quantity, stockAdjustment.quantity - 1)"
-                  class="bg-gradient-to-br border border-red-500/20 p-2.5 rounded-lg duration-200 from-red-500/10 group hover:from-red-500/20 hover:to-red-600/20 to-red-600/10 transition-all"><svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="h-5 text-red-400 w-5 group-hover:text-red-300 transition-colors" viewBox="0 0 20 20"
-                    fill="currentColor">
-                    <path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
-                      clip-rule="evenodd" />
-                  </svg></button>
-                <input id="stock-quantity" v-model.number="stockAdjustment.quantity" type="number" :max="999999"
-                  :min="-selectedItem.quantity"
+                <!-- Remove minus button, only allow positive adjustment -->
+                <input id="stock-quantity" v-model.number="stockAdjustment.quantity" type="number" :min="1" :max="999999"
                   class="flex-1 bg-gray-800 border border-gray-700 rounded-lg text-2xl text-center text-white duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 font-bold px-4 py-2.5 transition-all" />
                 <button @click="stockAdjustment.quantity++"
-                  class="bg-gradient-to-br border border-emerald-500/20 p-2.5 rounded-lg duration-200 from-emerald-500/10 group hover:from-emerald-500/20 hover:to-emerald-600/20 to-emerald-600/10 transition-all"><svg
-                    xmlns="http://www.w3.org/2000/svg"
+                  class="bg-gradient-to-br border border-emerald-500/20 p-2.5 rounded-lg duration-200 from-emerald-500/10 group hover:from-emerald-500/20 hover:to-emerald-600/20 to-emerald-600/10 transition-all">
+                  <svg xmlns="http://www.w3.org/2000/svg"
                     class="h-5 text-emerald-400 w-5 group-hover:text-emerald-300 transition-colors" viewBox="0 0 20 20"
                     fill="currentColor">
                     <path fill-rule="evenodd"
                       d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
                       clip-rule="evenodd" />
-                  </svg></button>
+                  </svg>
+                </button>
               </div>
             </div>
           </div>
           <div class="flex border-gray-700/50 border-t justify-end gap-3 items-center mt-8 pt-6">
             <button @click="closeStockModal"
               class="rounded-lg text-gray-400 duration-200 hover:bg-gray-700/50 hover:text-gray-300 px-4 py-2 transition-colors">Cancel</button>
-            <button @click="confirmStockAdjustment" :disabled="stockAdjustment.quantity === 0 || isUpdatingStock"
-              :class="['px-6 py-2.5 rounded-lg transition-all duration-200 flex items-center gap-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed', stockAdjustment.quantity > 0 ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white shadow-lg shadow-emerald-500/20' : 'bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white shadow-lg shadow-red-500/20']">
+            <button @click="confirmStockAdjustment" :disabled="stockAdjustment.quantity <= 0 || isUpdatingStock"
+              class="px-6 py-2.5 rounded-lg transition-all duration-200 flex items-center gap-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white shadow-lg shadow-emerald-500/20">
               <template v-if="isUpdatingStock"><svg class="h-5 w-5 animate-spin" xmlns="http://www.w3.org/2000/svg"
                   fill="none" viewBox="0 0 24 24">
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                   <path class="opacity-75" fill="currentColor"
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
                   </path>
-                </svg><span>{{ stockAdjustment.quantity > 0 ? 'Adding...' : 'Removing...' }}</span></template>
-              <template v-else>{{ stockAdjustment.quantity > 0 ? 'Add Stock' : 'Remove Stock' }}</template>
+                </svg><span>Adding...</span></template>
+              <template v-else>Add Stock</template>
             </button>
           </div>
         </div>
@@ -1263,7 +1426,7 @@ const FormLabel = {
             <span class="text-gray-300">Stock value analysis</span>
           </div>
           <div class="flex text-sm gap-2 items-center">
-            <CheckIcon class="h-5 text-emerald-400 w-5" />
+                       <CheckIcon class="h-5 text-emerald-400 w-5" />
             <span class="text-gray-300">Low stock alerts</span>
           </div>
         </div>
@@ -1286,9 +1449,6 @@ const FormLabel = {
             <svg class="h-8 text-indigo-500 w-8 animate-spin mb-3 mx-auto" xmlns="http://www.w3.org/2000/svg"
               fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824  3 7.938l3-2.647z">
-              </path>
             </svg>
             <p class="text-white font-medium">Generating Report...</p>
             <p class="text-gray-400 text-sm mt-1">Please wait a moment</p>
@@ -1345,11 +1505,25 @@ const FormLabel = {
               </span>
             </div>
             <div class="grid grid-cols-2 gap-6">
-              <div><span class="text-gray-400 text-sm">Current Stock</span>
+              <div>
+                <span class="text-gray-400 text-sm">Current Stock</span>
                 <div class="text-3xl text-white font-bold mt-1">{{ selectedItem.quantity }}</div>
               </div>
-              <div class="text-right"><span class="text-gray-400 text-sm">Location</span>
+              <div class="text-right">
+                <span class="text-gray-400 text-sm">Location</span>
                 <div class="text-lg text-white font-medium mt-1">{{ selectedItem.location }}</div>
+              </div>
+            </div>
+            <!-- Supplier Info -->
+            <div v-if="selectedItem.product?.supplier" class="mt-6">
+              <div class="flex gap-4 items-center">
+                <img v-if="selectedItem.product.image_url" :src="selectedItem.product.image_url" alt="Product Image" class="h-16 w-16 object-cover rounded-lg border border-gray-700" />
+                <div>
+                  <div class="text-gray-400 text-sm">Supplier</div>
+                  <div class="text-white font-bold">{{ selectedItem.product.supplier.name }}</div>
+                  <div class="text-gray-400 text-xs">Email: {{ selectedItem.product.supplier.email }}</div>
+                  <div class="text-gray-400 text-xs">Contact: {{ selectedItem.product.supplier.contact }}</div>
+                </div>
               </div>
             </div>
           </div>
@@ -1524,6 +1698,99 @@ const FormLabel = {
         </div>
       </Dialog>
     </TransitionRoot>
+
+    <!-- Return Product Modal -->
+    <div v-if="showReturnModal"
+      class="flex bg-black/80 justify-center p-4 backdrop-blur-sm fixed inset-0 items-center z-50">
+      <div class="bg-gradient-to-br border border-gray-700/50 p-6 rounded-2xl shadow-2xl w-full animate-fade-in from-gray-900/95 max-w-lg to-gray-800/95">
+        <div class="flex justify-between items-start mb-8">
+          <div class="flex gap-4 items-center">
+            <div class="bg-gradient-to-br border border-yellow-500/20 p-3 rounded-xl shadow-lg from-yellow-600/10 to-yellow-700/10">
+              <ArrowLeftIcon class="h-6 text-yellow-400 w-6" />
+            </div>
+            <div>
+              <h2 class="text-2xl text-white font-bold mb-1">Return Product</h2>
+              <p class="text-gray-400 text-sm">Process a product return</p>
+            </div>
+          </div>
+          <button @click="closeReturnModal" class="p-2 rounded-lg duration-200 hover:bg-gray-700/50 transition-colors">
+            <XMarkIcon class="h-5 text-gray-400 w-5" />
+          </button>
+        </div>
+        <div v-if="selectedItem" class="space-y-6">
+          <div class="bg-gradient-to-br border border-gray-700/50 p-5 rounded-xl from-gray-800 to-gray-800/50">
+            <div class="flex gap-2 items-center mb-2">
+              <ArchiveBoxIcon class="h-5 text-gray-400 w-5" />
+              <span class="text-gray-400">Item #{{ selectedItem.id }}</span>
+            </div>
+            <div class="text-white font-bold">{{ selectedItem.product?.name || 'Unknown' }}</div>
+            <div class="text-gray-400 text-sm">Current Stock: {{ selectedItem.quantity }}</div>
+          </div>
+          <div class="space-y-4">
+            <FormField>
+              <FormLabel>Return Quantity</FormLabel>
+              <input v-model.number="returnDetails.quantity" type="number" min="1" class="form-input" required />
+            </FormField>
+            <FormField>
+              <FormLabel>Reason</FormLabel>
+              <input v-model="returnDetails.reason" type="text" class="form-input" placeholder="Reason for return" />
+            </FormField>
+            <FormField>
+              <FormLabel>Returned By</FormLabel>
+              <input v-model="returnDetails.returned_by" type="text" class="form-input" placeholder="Staff name" />
+            </FormField>
+          </div>
+          <div class="flex justify-end gap-3 mt-6">
+            <button @click="closeReturnModal" class="btn-secondary">Cancel</button>
+            <button @click="submitReturn" :disabled="isReturning" class="btn-primary">
+              {{ isReturning ? 'Processing...' : 'Submit Return' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Supplier Payment Modal -->
+    <div v-if="showPaymentModal" class="flex bg-black/80 justify-center p-4 backdrop-blur-sm fixed inset-0 items-center z-50">
+      <div class="bg-gradient-to-br border border-gray-700/50 p-6 rounded-2xl shadow-2xl w-full max-w-md animate-fade-in from-gray-900/95 to-gray-800/95">
+        <div class="flex justify-between items-center mb-6">
+          <div>
+            <h2 class="text-2xl text-white font-bold mb-1">Supplier Payment</h2>
+            <p class="text-gray-400 text-sm">Pay supplier for the new product</p>
+          </div>
+          <button @click="showPaymentModal = false" class="p-2 rounded-lg hover:bg-gray-700/50 transition-colors">
+            <XMarkIcon class="h-5 text-gray-400 w-5" />
+          </button>
+        </div>
+        <form @submit.prevent="submitSupplierPayment" class="space-y-4">
+          <div>
+            <label class="form-label">Amount</label>
+            <input v-model="paymentDetails.amount" type="number" min="0" class="form-input" required />
+          </div>
+          <div>
+            <label class="form-label">Payment Method</label>
+            <select v-model="paymentDetails.payment_method" class="form-input" required>
+              <option value="cash">Cash</option>
+              <option value="check">Check</option>
+            </select>
+          </div>
+          <div v-if="paymentDetails.payment_method === 'check'">
+            <label class="form-label">Check Number</label>
+            <input v-model="paymentDetails.check_number" type="text" class="form-input" required />
+          </div>
+          <div>
+            <label class="form-label">Notes</label>
+            <input v-model="paymentDetails.notes" type="text" class="form-input" placeholder="Optional" />
+          </div>
+          <div class="flex justify-end gap-3 mt-6">
+            <button @click="showPaymentModal = false" type="button" class="btn-secondary">Cancel</button>
+            <button type="submit" :disabled="isPayingSupplier" class="btn-primary">
+              {{ isPayingSupplier ? 'Processing...' : 'Pay Supplier' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 </template>
 

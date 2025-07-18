@@ -77,7 +77,9 @@ const transactionId = ref('')
 const invoiceNumber = ref('')
 const currentDate = ref('')
 const applyDiscount = ref(false)
-const customDiscountRate = ref(10)
+const customDiscountRate = ref(10
+
+)
 
 const customers = ref([])
 const loading = ref(true)
@@ -198,7 +200,8 @@ const addToOrder = (product) => {
         width: 0,
         height: 0,
         totalArea: 0,
-        dimensions: ''
+        dimensions: '',
+        specialNote: '' // <-- Add this line
       })
       showToast(`Added ${product.name} to order`)
     } else {
@@ -437,7 +440,8 @@ const handleAdvancePayment = async () => {
       remaining_balance: remainingBalance.value,
       cashier_id: cashierId.value,
       customer_id: selectedCustomer.value?.id,
-      discount: applyDiscount.value ? customDiscountRate.value : 0,
+      cart_discount: applyDiscount.value ? customDiscountRate.value : 0, // <-- use cart_discount
+      payment_status: paymentStatus.value, // <-- always send payment_status
       items: orderItems.value.map(item => ({
         product_id: item.id,
         quantity: item.quantity,
@@ -445,9 +449,15 @@ const handleAdvancePayment = async () => {
         product_discount: item.productDiscount,
         width: item.width || null,
         height: item.height || null,
-        totalAreaMeters: item.totalAreaMeters || null
+        totalAreaMeters: item.totalAreaMeters || null,
+        specialNote: item.specialNote || '' // <-- Add this line
       }))
     };
+
+    // Add check_details if payment type is CHECK
+    if (selectedPaymentMethod.value === 'CHECK') {
+      salesData.check_details = { ...checkDetails.value };
+    }
 
     const response = await connection.post('/sales', salesData);
     
@@ -517,7 +527,7 @@ const completeOrder = async () => {
       cashier_id: cashierId.value,
       customer_id: customerName.value === 'Walk-in Customer' ? null : 
         customers.value.find(c => c.name === customerName.value)?.id,
-      discount: applyDiscount.value ? customDiscountRate.value : 0,
+      cart_discount: applyDiscount.value ? customDiscountRate.value : 0, // <-- use cart_discount
       items: orderItems.value.map(item => ({
         product_id: item.id,
         quantity: item.quantity,
@@ -525,7 +535,8 @@ const completeOrder = async () => {
         product_discount: item.productDiscount,
         width: item.width || null,
         height: item.height || null,
-        totalAreaMeters: item.totalAreaMeters || null
+        totalAreaMeters: item.totalAreaMeters || null,
+        specialNote: item.specialNote || '' // <-- Add this line
       }))
     };
 
@@ -1009,13 +1020,14 @@ watch(() => total.value, (newTotal) => {
                     </div>
 
                     <div class="flex items-center gap-2 mt-2">
-                      <div class="text-xs text-gray-400">Discount:</div>
+                      <div class="text-xs text-gray-400 mb-1">Discount:</div>
                       <div class="flex items-center gap-1">
                         <input 
                           type="number" 
                           v-model.number="item.productDiscount" 
                           @input="updateProductDiscount(item, item.productDiscount)"
-                          class="w-14 bg-gray-700/50 border border-gray-600/50 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-400/30 text-center"
+                          class="w-14 bg-gray-700/50 border border-gray-600/50 rounded-lg px-2 py-1 
+                                 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-400/30 text-center"
                           min="0"
                           max="100"
                         />
@@ -1064,6 +1076,18 @@ watch(() => total.value, (newTotal) => {
                         <Trash2 class="w-3.5 h-3.5" />
                       </button>
                     </div>
+                  </div>
+
+                  <!-- Special Note Field -->
+                  <div class="mt-2">
+                    <label class="block text-xs text-gray-400 mb-1">Special Note (optional):</label>
+                    <input
+                      type="text"
+                      v-model="item.specialNote"
+                      maxlength="255"
+                      class="w-full bg-gray-700/50 border border-gray-600/50 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-400/30"
+                      placeholder="Add a note for this item (e.g. custom instructions)"
+                    />
                   </div>
                 </div>
               </div>
@@ -1332,7 +1356,7 @@ watch(() => total.value, (newTotal) => {
           </button>
           <button 
             @click="selectedPaymentMethod === 'CHECK' ? handleCheckPaymentSubmit() : completeOrder()"
-            :disabled="isProcessingOrder || (isAdvancePayment && advanceAmount <= 0) || (selectedPaymentMethod === 'CHECK' && (!checkDetails.bankName || !checkDetails.checkNumber))"
+            :disabled="isProcessingOrder || (selectedPaymentMethod === 'CHECK' && (!checkDetails.bankName || !checkDetails.checkNumber))"
             class="flex-1 py-3 px-4 bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors duration-200 
                    flex items-center justify-center gap-2 text-sm text-white disabled:opacity-50 
                    disabled:cursor-not-allowed disabled:hover:bg-blue-500">
@@ -1471,6 +1495,7 @@ watch(() => total.value, (newTotal) => {
                   <th class="py-3 px-4 text-right text-xs font-medium text-gray-600 uppercase tracking-wider">Rate</th>
                   <th class="py-3 px-4 text-center text-xs font-medium text-gray-600 uppercase tracking-wider">Qty</th>
                   <th class="py-3 px-4 text-right text-xs font-medium text-gray-600 uppercase tracking-wider">Amount</th>
+                  <th class="py-3 px-4 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Special Note</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-200">
@@ -1496,6 +1521,10 @@ watch(() => total.value, (newTotal) => {
                   <td class="py-4 px-4 text-center text-gray-800">{{ item.quantity }}</td>
                   <td class="py-4 px-4 text-right font-medium text-gray-800">
                     Rs. {{ getItemTotal(item).toLocaleString() }}
+                  </td>
+                  <td class="py-4 px-4 text-left text-gray-800">
+                    <span v-if="item.specialNote && item.specialNote.trim() !== ''">{{ item.specialNote }}</span>
+                    <span v-else class="text-gray-400">-</span>
                   </td>
                 </tr>
               </tbody>
