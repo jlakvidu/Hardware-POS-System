@@ -513,335 +513,344 @@ const isValidEditCustomer = computed(() => {
                     </div>
                 </div>
                 
-                <div v-if="showModal"
-                    class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50">
-                    <div
-                        class="bg-gray-800 rounded-lg w-[600px] p-6 shadow-xl transform transition-all duration-300 scale-100 border border-gray-700/50">
-                        <div class="flex justify-between items-center mb-6 border-b border-gray-700 pb-4">
-                            <div class="flex items-center space-x-2">
-                                <div class="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-md">
-                                    <UserPlusIcon class="w-5 h-5 text-white" />
+                <transition name="modal-fade">
+                    <div v-if="showModal"
+                        class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50">
+                        <div
+                            class="bg-white/10 backdrop-blur-lg shadow-2xl rounded-2xl border border-blue-500/20 w-[500px] p-8 relative"
+                            style="box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);">
+                            <!-- Accent Bar -->
+                            <div class="absolute top-0 left-0 w-full h-2 rounded-t-2xl bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
+                            <div class="flex justify-between items-center mb-6 border-b border-gray-700 pb-4">
+                                <div class="flex items-center space-x-2">
+                                    <div class="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-md">
+                                        <UserPlusIcon class="w-5 h-5 text-white" />
+                                    </div>
+                                    <h2 class="text-xl font-semibold">Add New Customer</h2>
                                 </div>
-                                <h2 class="text-xl font-semibold">Add New Customer</h2>
+                                <button @click="showModal = false"
+                                    class="text-gray-400 hover:text-gray-200 hover:bg-gray-700 p-2 rounded-full transition-colors">
+                                    <XMarkIcon class="w-5 h-5" />
+                                </button>
                             </div>
-                            <button @click="showModal = false"
-                                class="text-gray-400 hover:text-gray-200 hover:bg-gray-700 p-2 rounded-full transition-colors">
-                                <XMarkIcon class="w-5 h-5" />
-                            </button>
-                        </div>
-                        <form @submit.prevent="handleAddSubmit" class="space-y-6">
-                            <div class="grid grid-cols-2 gap-6">
-                                <div class="col-span-2 bg-gray-750 p-4 rounded-lg space-y-4">
-                                    <h3 class="text-sm font-medium text-blue-400 uppercase tracking-wider mb-3">Customer
-                                        Details</h3>
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-300 mb-1">Customer Name</label>
-                                        <input v-model="newCustomer.name" 
-                                            @input="validateInput('name', newCustomer.name)"
-                                            type="text"
-                                            class="w-full px-4 py-2.5 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border"
-                                            :class="[
-                                                formErrors.name ? 'border-red-500' : 'border-gray-600',
-                                                !formErrors.name && newCustomer.name ? 'border-blue-500' : ''
-                                            ]"
-                                            placeholder="Enter customer name" 
-                                            required>
-                                        <p v-if="formErrors.name" class="mt-1 text-sm text-red-500">{{ formErrors.name }}</p>
+                            <form @submit.prevent="handleAddSubmit" class="space-y-6">
+                                <div class="grid grid-cols-2 gap-6">
+                                    <div class="col-span-2 bg-gray-750 p-4 rounded-lg space-y-4">
+                                        <h3 class="text-sm font-medium text-blue-400 uppercase tracking-wider mb-3">Customer Details</h3>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-300 mb-1">Customer Name</label>
+                                            <div class="relative mb-6">
+                                                <input
+                                                    v-model="newCustomer.name"
+                                                    type="text"
+                                                    id="customerName"
+                                                    class="peer w-full bg-gray-800/80 border border-gray-600 rounded-lg px-4 pt-6 pb-2 text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500 transition-all"
+                                                    placeholder=" "
+                                                    required
+                                                />
+                                                <label
+                                                    for="customerName"
+                                                    class="absolute left-4 top-2 text-gray-400 text-sm transition-all peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-500 peer-focus:top-2 peer-focus:text-sm peer-focus:text-blue-400"
+                                                >
+                                                    Customer Name
+                                                </label>
+                                            </div>
+                                            <p v-if="formErrors.name" class="mt-1 text-sm text-red-500">{{ formErrors.name }}</p>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-300 mb-1">Address</label>
+                                            <input v-model="newCustomer.address"
+                                                @input="validateInput('address', newCustomer.address)"
+                                                type="text"
+                                                class="w-full px-4 py-2.5 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border"
+                                                :class="[
+                                                    formErrors.address ? 'border-red-500' : 'border-gray-600',
+                                                    !formErrors.address && newCustomer.address ? 'border-blue-500' : ''
+                                                ]"
+                                                placeholder="Enter address (optional)">
+                                            <p v-if="formErrors.address" class="mt-1 text-sm text-red-500">{{ formErrors.address }}</p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-300 mb-1">Address</label>
-                                        <input v-model="newCustomer.address"
-                                            @input="validateInput('address', newCustomer.address)"
-                                            type="text"
-                                            class="w-full px-4 py-2.5 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border"
-                                            :class="[
-                                                formErrors.address ? 'border-red-500' : 'border-gray-600',
-                                                !formErrors.address && newCustomer.address ? 'border-blue-500' : ''
-                                            ]"
-                                            placeholder="Enter address (optional)">
-                                        <p v-if="formErrors.address" class="mt-1 text-sm text-red-500">{{ formErrors.address }}</p>
+
+                                    <div class="bg-gray-750 p-4 rounded-lg space-y-4">
+                                        <h3 class="text-sm font-medium text-blue-400 uppercase tracking-wider mb-3">Contact</h3>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-300 mb-1">Contact Number</label>
+                                            <div class="relative">
+                                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
+                                                    <PhoneIcon class="w-5 h-5" />
+                                                </span>
+                                                <input v-model="newCustomer.contact_number"
+                                                    @input="validateInput('contact_number', newCustomer.contact_number)"
+                                                    type="text"
+                                                    class="w-full pl-10 pr-4 py-2.5 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border"
+                                                    :class="[
+                                                        formErrors.contact_number ? 'border-red-500' : 'border-gray-600',
+                                                        !formErrors.contact_number && newCustomer.contact_number ? 'border-blue-500' : ''
+                                                    ]"
+                                                    placeholder="555-123-4567"
+                                                    required>
+                                            </div>
+                                            <p v-if="formErrors.contact_number" class="mt-1 text-sm text-red-500">{{ formErrors.contact_number }}</p>
+                                        </div>
+                                    </div>
+                                    <div class="bg-gray-750 p-4 rounded-lg space-y-4">
+                                        <h3 class="text-sm font-medium text-blue-400 uppercase tracking-wider mb-3">Email</h3>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-300 mb-1">Email Address</label>
+                                            <div class="relative">
+                                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
+                                                    <EnvelopeIcon class="w-5 h-5" />
+                                                </span>
+                                                <input v-model="newCustomer.email"
+                                                    @input="validateInput('email', newCustomer.email)"
+                                                    type="email"
+                                                    class="w-full pl-10 pr-4 py-2.5 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border"
+                                                    :class="[
+                                                        formErrors.email ? 'border-red-500' : 'border-gray-600',
+                                                        !formErrors.email && newCustomer.email ? 'border-blue-500' : ''
+                                                    ]"
+                                                    placeholder="example@company.com"
+                                                    required>
+                                            </div>
+                                            <p v-if="formErrors.email" class="mt-1 text-sm text-red-500">{{ formErrors.email }}</p>
+                                        </div>
                                     </div>
                                 </div>
+                                <div class="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-700">
+                                    <button type="button" @click="showModal = false"
+                                        class="px-4 py-2.5 text-gray-300 hover:text-white bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors duration-200 flex items-center">
+                                        <XMarkIcon class="w-5 h-5 mr-2" />
+                                        Cancel
+                                    </button>
+                                    <button type="submit"
+                                        :disabled="!isValidNewCustomer || isAddingCustomer"
+                                        :class="[
+                                            'px-4 py-2.5 rounded-lg transition-all duration-300 flex items-center space-x-2',
+                                            isValidNewCustomer && !isAddingCustomer
+                                                ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-800 hover:shadow-lg hover:shadow-blue-500/30 text-white' 
+                                                : 'bg-gray-600 cursor-not-allowed text-gray-400'
+                                        ]">
+                                        <template v-if="isAddingCustomer">
+                                            <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            <span>Adding Customer...</span>
+                                        </template>
+                                        <template v-else>
+                                            <CheckIcon class="w-5 h-5" />
+                                            <span>Add Customer</span>
+                                        </template>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </transition>
 
-                                <div class="bg-gray-750 p-4 rounded-lg space-y-4">
-                                    <h3 class="text-sm font-medium text-blue-400 uppercase tracking-wider mb-3">Contact
-                                    </h3>
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-300 mb-1">Contact
-                                            Number</label>
-                                        <div class="relative">
-                                            <span
-                                                class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
-                                                <PhoneIcon class="w-5 h-5" />
-                                            </span>
-                                            <input v-model="newCustomer.contact_number" 
-                                                @input="validateInput('contact_number', newCustomer.contact_number)"
-                                                type="text"
-                                                class="w-full pl-10 pr-4 py-2.5 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border"
-                                                :class="[
-                                                    formErrors.contact_number ? 'border-red-500' : 'border-gray-600',
-                                                    !formErrors.contact_number && newCustomer.contact_number ? 'border-blue-500' : ''
-                                                ]"
-                                                placeholder="555-123-4567" 
-                                                required>
-                                        </div>
-                                        <p v-if="formErrors.contact_number" class="mt-1 text-sm text-red-500">{{ formErrors.contact_number }}</p>
+                <transition name="modal-fade">
+                    <div v-if="showEditModal"
+                        class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50">
+                        <div
+                            class="bg-white/10 backdrop-blur-lg shadow-2xl rounded-2xl border border-blue-500/20 w-[500px] p-8 relative"
+                            style="box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);">
+                            <!-- Accent Bar -->
+                            <div class="absolute top-0 left-0 w-full h-2 rounded-t-2xl bg-gradient-to-r from-purple-500 to-pink-600"></div>
+                            <div class="flex justify-between items-center mb-6 border-b border-gray-700 pb-4">
+                                <div class="flex items-center space-x-2">
+                                    <div class="p-2 bg-gradient-to-r from-purple-500 to-pink-600 rounded-md">
+                                        <PencilIcon class="w-5 h-5 text-white" />
                                     </div>
+                                    <h2 class="text-xl font-semibold">Edit Customer Details</h2>
+                                </div>
+                                <button @click="showEditModal = false"
+                                    class="text-gray-400 hover:text-gray-200 hover:bg-gray-700 p-2 rounded-full transition-colors">
+                                    <XMarkIcon class="w-5 h-5" />
+                                </button>
+                            </div>
+                            <form @submit.prevent="handleEditSubmit" class="space-y-6">
+                                <div class="grid grid-cols-2 gap-6">
+                                    <div class="col-span-2 bg-gray-750 p-4 rounded-lg space-y-4">
+                                        <h3 class="text-sm font-medium text-purple-400 uppercase tracking-wider mb-3">Customer Details</h3>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-300 mb-1">Customer Name</label>
+                                            <div class="relative mb-6">
+                                                <input
+                                                    v-model="editingCustomer.name"
+                                                    type="text"
+                                                    id="editCustomerName"
+                                                    class="peer w-full bg-gray-800/80 border border-gray-600 rounded-lg px-4 pt-6 pb-2 text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-500 transition-all"
+                                                    placeholder=" "
+                                                    required
+                                                />
+                                                <label
+                                                    for="editCustomerName"
+                                                    class="absolute left-4 top-2 text-gray-400 text-sm transition-all peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-500 peer-focus:top-2 peer-focus:text-sm peer-focus:text-purple-400"
+                                                >
+                                                    Customer Name
+                                                </label>
+                                            </div>
+                                            <p v-if="formErrors.name" class="mt-1 text-sm text-red-500">{{ formErrors.name }}</p>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-300 mb-1">Address</label>
+                                            <input v-model="editingCustomer.address"
+                                                @input="validateInput('address', editingCustomer.address)"
+                                                type="text"
+                                                class="w-full px-4 py-2.5 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border"
+                                                :class="[
+                                                    formErrors.address ? 'border-red-500' : 'border-gray-600',
+                                                    !formErrors.address && editingCustomer.address ? 'border-purple-500' : ''
+                                                ]"
+                                                placeholder="Enter address (optional)">
+                                            <p v-if="formErrors.address" class="mt-1 text-sm text-red-500">{{ formErrors.address }}</p>
+                                        </div>
+                                    </div>
+                                    <div class="bg-gray-750 p-4 rounded-lg space-y-4">
+                                        <h3 class="text-sm font-medium text-purple-400 uppercase tracking-wider mb-3">Contact</h3>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-300 mb-1">Contact Number</label>
+                                            <div class="relative">
+                                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
+                                                    <PhoneIcon class="w-5 h-5" />
+                                                </span>
+                                                <input v-model="editingCustomer.contact[0].contact_number"
+                                                    @input="validateInput('contact_number', editingCustomer.contact[0].contact_number)"
+                                                    type="text"
+                                                    class="w-full pl-10 pr-4 py-2.5 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border"
+                                                    :class="[
+                                                        formErrors.contact_number ? 'border-red-500' : 'border-gray-600',
+                                                        !formErrors.contact_number && editingCustomer.contact[0].contact_number ? 'border-purple-500' : ''
+                                                    ]"
+                                                    placeholder="555-123-4567"
+                                                    required>
+                                            </div>
+                                            <p v-if="formErrors.contact_number" class="mt-1 text-sm text-red-500">{{ formErrors.contact_number }}</p>
+                                        </div>
+                                    </div>
+                                    <div class="bg-gray-750 p-4 rounded-lg space-y-4">
+                                        <h3 class="text-sm font-medium text-purple-400 uppercase tracking-wider mb-3">Email</h3>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-300 mb-1">Email Address</label>
+                                            <div class="relative">
+                                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
+                                                    <EnvelopeIcon class="w-5 h-5" />
+                                                </span>
+                                                <input v-model="editingCustomer.email"
+                                                    @input="validateInput('email', editingCustomer.email)"
+                                                    type="email"
+                                                    class="w-full pl-10 pr-4 py-2.5 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border"
+                                                    :class="[
+                                                        formErrors.email ? 'border-red-500' : 'border-gray-600',
+                                                        !formErrors.email && editingCustomer.email ? 'border-purple-500' : ''
+                                                    ]"
+                                                    placeholder="example@company.com"
+                                                    required>
+                                            </div>
+                                            <p v-if="formErrors.email" class="mt-1 text-sm text-red-500">{{ formErrors.email }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-700">
+                                    <button type="button" @click="showEditModal = false"
+                                        class="px-4 py-2.5 text-gray-300 hover:text-white bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors duration-200 flex items-center">
+                                        <XMarkIcon class="w-5 h-5 mr-2" />
+                                        Cancel
+                                    </button>
+                                    <button type="submit"
+                                        :disabled="!isValidEditCustomer || isUpdatingCustomer"
+                                        :class="[
+                                            'px-4 py-2.5 rounded-lg transition-all duration-300 flex items-center space-x-2',
+                                            isValidEditCustomer && !isUpdatingCustomer
+                                                ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 hover:shadow-lg hover:shadow-purple-500/30 text-white' 
+                                                : 'bg-gray-600 cursor-not-allowed text-gray-400'
+                                        ]">
+                                        <template v-if="isUpdatingCustomer">
+                                            <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            <span>Updating Customer...</span>
+                                        </template>
+                                        <template v-else>
+                                            <CheckIcon class="w-5 h-5" />
+                                            <span>Update Customer</span>
+                                        </template>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </transition>
+
+                <transition name="modal-fade">
+                    <div v-if="showViewModal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50">
+                        <div class="bg-gradient-to-b from-gray-800 to-gray-900 rounded-lg w-[500px] p-6 shadow-xl border border-gray-700/50">
+                            <div class="flex justify-between items-center mb-6 border-b border-gray-700/50 pb-4">
+                                <div class="flex items-center space-x-2">
+                                    <div class="p-2 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-md">
+                                        <EyeIcon class="w-5 h-5 text-white" />
+                                    </div>
+                                    <h2 class="text-xl font-semibold text-cyan-400">Customer Details</h2>
+                                </div>
+                                <button @click="closeViewModal"
+                                    class="text-gray-400 hover:text-gray-200 hover:bg-gray-700 p-2 rounded-full transition-colors">
+                                    <XMarkIcon class="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <div class="space-y-4" v-if="viewingCustomer">
+                                <div class="bg-gray-800/50 backdrop-blur-sm p-4 rounded-lg border border-gray-700/30 hover:border-blue-500/50 transition-colors duration-300">
+                                    <h3 class="text-sm font-medium text-blue-400 uppercase mb-2">Customer ID</h3>
+                                    <p class="text-white flex items-center">
+                                        <span class="inline-block w-6 h-6 bg-gray-700 rounded-full mr-2 flex items-center justify-center text-xs text-blue-400">#</span>
+                                        {{ viewingCustomer.id }}
+                                    </p>
                                 </div>
                                 
-                                <div class="bg-gray-750 p-4 rounded-lg space-y-4">
-                                    <h3 class="text-sm font-medium text-blue-400 uppercase tracking-wider mb-3">Email
-                                    </h3>
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-300 mb-1">Email Address</label>
-                                        <div class="relative">
-                                            <span
-                                                class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
-                                                <EnvelopeIcon class="w-5 h-5" />
-                                            </span>
-                                            <input v-model="newCustomer.email" 
-                                                @input="validateInput('email', newCustomer.email)"
-                                                type="email"
-                                                class="w-full pl-10 pr-4 py-2.5 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border"
-                                                :class="[
-                                                    formErrors.email ? 'border-red-500' : 'border-gray-600',
-                                                    !formErrors.email && newCustomer.email ? 'border-blue-500' : ''
-                                                ]"
-                                                placeholder="example@company.com" 
-                                                required>
-                                        </div>
-                                        <p v-if="formErrors.email" class="mt-1 text-sm text-red-500">{{ formErrors.email }}</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-700">
-                                <button type="button" @click="showModal = false"
-                                    class="px-4 py-2.5 text-gray-300 hover:text-white bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors duration-200 flex items-center">
-                                    <XMarkIcon class="w-5 h-5 mr-2" />
-                                    Cancel
-                                </button>
-                                <button type="submit"
-                                    :disabled="!isValidNewCustomer || isAddingCustomer"
-                                    :class="[
-                                        'px-4 py-2.5 rounded-lg transition-all duration-300 flex items-center space-x-2',
-                                        isValidNewCustomer && !isAddingCustomer
-                                            ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-800 hover:shadow-lg hover:shadow-blue-500/30 text-white' 
-                                            : 'bg-gray-600 cursor-not-allowed text-gray-400'
-                                    ]">
-                                    <template v-if="isAddingCustomer">
-                                        <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                        <span>Adding Customer...</span>
-                                    </template>
-                                    <template v-else>
-                                        <CheckIcon class="w-5 h-5 mr-2" />
-                                        Add Customer
-                                    </template>
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-
-                <div v-if="showEditModal"
-                    class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50">
-                    <div
-                        class="bg-gray-800 rounded-lg w-[600px] p-6 shadow-xl transform transition-all duration-300 scale-100 border border-gray-700/50">
-                        <div class="flex justify-between items-center mb-6 border-b border-gray-700 pb-4">
-                            <div class="flex items-center space-x-2">
-                                <div class="p-2 bg-gradient-to-r from-purple-500 to-pink-600 rounded-md">
-                                    <PencilIcon class="w-5 h-5 text-white" />
-                                </div>
-                                <h2 class="text-xl font-semibold">Edit Customer Details</h2>
-                            </div>
-                            <button @click="showEditModal = false"
-                                class="text-gray-400 hover:text-gray-200 hover:bg-gray-700 p-2 rounded-full transition-colors">
-                                <XMarkIcon class="w-5 h-5" />
-                            </button>
-                        </div>
-
-                        <form @submit.prevent="handleEditSubmit" class="space-y-6">
-                            <div class="grid grid-cols-2 gap-6">
-                                <div class="col-span-2 bg-gray-750 p-4 rounded-lg space-y-4">
-                                    <h3 class="text-sm font-medium text-purple-400 uppercase tracking-wider mb-3">Customer
-                                        Details</h3>
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-300 mb-1">Customer Name</label>
-                                        <input v-model="editingCustomer.name" 
-                                            @input="validateInput('name', editingCustomer.name)"
-                                            type="text"
-                                            class="w-full px-4 py-2.5 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border"
-                                            :class="[
-                                                formErrors.name ? 'border-red-500' : 'border-gray-600',
-                                                !formErrors.name && editingCustomer.name ? 'border-purple-500' : ''
-                                            ]"
-                                            placeholder="Enter customer name" 
-                                            required>
-                                        <p v-if="formErrors.name" class="mt-1 text-sm text-red-500">{{ formErrors.name }}</p>
-                                    </div>
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-300 mb-1">Address</label>
-                                        <input v-model="editingCustomer.address"
-                                            @input="validateInput('address', editingCustomer.address)"
-                                            type="text"
-                                            class="w-full px-4 py-2.5 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border"
-                                            :class="[
-                                                formErrors.address ? 'border-red-500' : 'border-gray-600',
-                                                !formErrors.address && editingCustomer.address ? 'border-purple-500' : ''
-                                            ]"
-                                            placeholder="Enter address (optional)">
-                                        <p v-if="formErrors.address" class="mt-1 text-sm text-red-500">{{ formErrors.address }}</p>
-                                    </div>
-                                </div>
-
-                                <div class="bg-gray-750 p-4 rounded-lg space-y-4">
-                                    <h3 class="text-sm font-medium text-purple-400 uppercase tracking-wider mb-3">Contact
-                                    </h3>
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-300 mb-1">Contact Number</label>
-                                        <div class="relative">
-                                            <span
-                                                class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
-                                                <PhoneIcon class="w-5 h-5" />
-                                            </span>
-                                            <input v-model="editingCustomer.contact[0].contact_number"
-                                                @input="validateInput('contact_number', editingCustomer.contact[0].contact_number)"
-                                                type="text"
-                                                class="w-full pl-10 pr-4 py-2.5 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border"
-                                                :class="[
-                                                    formErrors.contact_number ? 'border-red-500' : 'border-gray-600',
-                                                    !formErrors.contact_number && editingCustomer.contact[0].contact_number ? 'border-purple-500' : ''
-                                                ]"
-                                                placeholder="555-123-4567" 
-                                                required>
-                                        </div>
-                                        <p v-if="formErrors.contact_number" class="mt-1 text-sm text-red-500">{{ formErrors.contact_number }}</p>
-                                    </div>
+                                <div class="bg-gray-800/50 backdrop-blur-sm p-4 rounded-lg border border-gray-700/30 hover:border-blue-500/50 transition-colors duration-300">
+                                    <h3 class="text-sm font-medium text-blue-400 uppercase mb-2">Customer Name</h3>
+                                    <p class="text-white flex items-center">
+                                        <UserIcon class="w-5 h-5 text-gray-400 mr-2" />
+                                        {{ viewingCustomer.name }}
+                                    </p>
                                 </div>
                                 
-                                <div class="bg-gray-750 p-4 rounded-lg space-y-4">
-                                    <h3 class="text-sm font-medium text-purple-400 uppercase tracking-wider mb-3">Email
-                                    </h3>
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-300 mb-1">Email Address</label>
-                                        <div class="relative">
-                                            <span
-                                                class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
-                                                <EnvelopeIcon class="w-5 h-5" />
-                                            </span>
-                                            <input v-model="editingCustomer.email" 
-                                                @input="validateInput('email', editingCustomer.email)"
-                                                type="email"
-                                                class="w-full pl-10 pr-4 py-2.5 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border"
-                                                :class="[
-                                                    formErrors.email ? 'border-red-500' : 'border-gray-600',
-                                                    !formErrors.email && editingCustomer.email ? 'border-purple-500' : ''
-                                                ]"
-                                                placeholder="example@company.com" 
-                                                required>
-                                        </div>
-                                        <p v-if="formErrors.email" class="mt-1 text-sm text-red-500">{{ formErrors.email }}</p>
-                                    </div>
+                                <div class="bg-gray-800/50 backdrop-blur-sm p-4 rounded-lg border border-gray-700/30 hover:border-blue-500/50 transition-colors duration-300">
+                                    <h3 class="text-sm font-medium text-blue-400 uppercase mb-2">Email Address</h3>
+                                    <p class="text-white flex items-center">
+                                        <EnvelopeIcon class="w-5 h-5 text-gray-400 mr-2" />
+                                        {{ viewingCustomer.email }}
+                                    </p>
+                                </div>
+                                
+                                <div class="bg-gray-800/50 backdrop-blur-sm p-4 rounded-lg border border-gray-700/30 hover:border-blue-500/50 transition-colors duration-300">
+                                    <h3 class="text-sm font-medium text-blue-400 uppercase mb-2">Contact Number</h3>
+                                    <p class="text-white flex items-center">
+                                        <PhoneIcon class="w-5 h-5 text-gray-400 mr-2" />
+                                        {{ viewingCustomer.contact[0].contact_number }}
+                                    </p>
+                                </div>
+
+                                <div class="bg-gray-800/50 backdrop-blur-sm p-4 rounded-lg border border-gray-700/30 hover:border-blue-500/50 transition-colors duration-300">
+                                    <h3 class="text-sm font-medium text-blue-400 uppercase mb-2">Address</h3>
+                                    <p class="text-white flex items-center">
+                                        <BuildingOfficeIcon class="w-5 h-5 text-gray-400 mr-2" />
+                                        {{ viewingCustomer.address || 'N/A' }}
+                                    </p>
                                 </div>
                             </div>
-                            <div class="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-700">
-                                <button type="button" @click="showEditModal = false"
-                                    class="px-4 py-2.5 text-gray-300 hover:text-white bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors duration-200 flex items-center">
-                                    <XMarkIcon class="w-5 h-5 mr-2" />
-                                    Cancel
-                                </button>
-                                <button type="submit"
-                                    :disabled="!isValidEditCustomer || isUpdatingCustomer"
-                                    :class="[
-                                        'px-4 py-2.5 rounded-lg transition-all duration-300 flex items-center space-x-2',
-                                        isValidEditCustomer && !isUpdatingCustomer
-                                            ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 hover:shadow-lg hover:shadow-purple-500/30 text-white' 
-                                            : 'bg-gray-600 cursor-not-allowed text-gray-400'
-                                    ]">
-                                    <template v-if="isUpdatingCustomer">
-                                        <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                        <span>Updating Customer...</span>
-                                    </template>
-                                    <template v-else>
-                                        <CheckIcon class="w-5 h-5 mr-2" />
-                                        Update Customer
-                                    </template>
+
+                            <div class="flex justify-end mt-6 pt-4 border-t border-gray-700">
+                                <button @click="closeViewModal"
+                                    class="px-4 py-2 bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 text-white rounded-md transition-all duration-300 hover:shadow-lg hover:shadow-gray-500/30">
+                                    Close
                                 </button>
                             </div>
-                        </form>
-                    </div>
-                </div>
-
-                <div v-if="showViewModal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50">
-                    <div class="bg-gradient-to-b from-gray-800 to-gray-900 rounded-lg w-[500px] p-6 shadow-xl border border-gray-700/50">
-                        <div class="flex justify-between items-center mb-6 border-b border-gray-700/50 pb-4">
-                            <div class="flex items-center space-x-2">
-                                <div class="p-2 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-md">
-                                    <EyeIcon class="w-5 h-5 text-white" />
-                                </div>
-                                <h2 class="text-xl font-semibold text-cyan-400">Customer Details</h2>
-                            </div>
-                            <button @click="closeViewModal"
-                                class="text-gray-400 hover:text-gray-200 hover:bg-gray-700 p-2 rounded-full transition-colors">
-                                <XMarkIcon class="w-5 h-5" />
-                            </button>
-                        </div>
-
-                        <div class="space-y-4" v-if="viewingCustomer">
-                            <div class="bg-gray-800/50 backdrop-blur-sm p-4 rounded-lg border border-gray-700/30 hover:border-blue-500/50 transition-colors duration-300">
-                                <h3 class="text-sm font-medium text-blue-400 uppercase mb-2">Customer ID</h3>
-                                <p class="text-white flex items-center">
-                                    <span class="inline-block w-6 h-6 bg-gray-700 rounded-full mr-2 flex items-center justify-center text-xs text-blue-400">#</span>
-                                    {{ viewingCustomer.id }}
-                                </p>
-                            </div>
-                            
-                            <div class="bg-gray-800/50 backdrop-blur-sm p-4 rounded-lg border border-gray-700/30 hover:border-blue-500/50 transition-colors duration-300">
-                                <h3 class="text-sm font-medium text-blue-400 uppercase mb-2">Customer Name</h3>
-                                <p class="text-white flex items-center">
-                                    <UserIcon class="w-5 h-5 text-gray-400 mr-2" />
-                                    {{ viewingCustomer.name }}
-                                </p>
-                            </div>
-                            
-                            <div class="bg-gray-800/50 backdrop-blur-sm p-4 rounded-lg border border-gray-700/30 hover:border-blue-500/50 transition-colors duration-300">
-                                <h3 class="text-sm font-medium text-blue-400 uppercase mb-2">Email Address</h3>
-                                <p class="text-white flex items-center">
-                                    <EnvelopeIcon class="w-5 h-5 text-gray-400 mr-2" />
-                                    {{ viewingCustomer.email }}
-                                </p>
-                            </div>
-                            
-                            <div class="bg-gray-800/50 backdrop-blur-sm p-4 rounded-lg border border-gray-700/30 hover:border-blue-500/50 transition-colors duration-300">
-                                <h3 class="text-sm font-medium text-blue-400 uppercase mb-2">Contact Number</h3>
-                                <p class="text-white flex items-center">
-                                    <PhoneIcon class="w-5 h-5 text-gray-400 mr-2" />
-                                    {{ viewingCustomer.contact[0].contact_number }}
-                                </p>
-                            </div>
-
-                            <div class="bg-gray-800/50 backdrop-blur-sm p-4 rounded-lg border border-gray-700/30 hover:border-blue-500/50 transition-colors duration-300">
-                                <h3 class="text-sm font-medium text-blue-400 uppercase mb-2">Address</h3>
-                                <p class="text-white flex items-center">
-                                    <BuildingOfficeIcon class="w-5 h-5 text-gray-400 mr-2" />
-                                    {{ viewingCustomer.address || 'N/A' }}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div class="flex justify-end mt-6 pt-4 border-t border-gray-700">
-                            <button @click="closeViewModal"
-                                class="px-4 py-2 bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 text-white rounded-md transition-all duration-300 hover:shadow-lg hover:shadow-gray-500/30">
-                                Close
-                            </button>
                         </div>
                     </div>
-                </div>
+                </transition>
             </div>
         </div>
     </div>
@@ -919,11 +928,11 @@ tbody tr:hover {
   background-color: rgba(31, 41, 55, 0.5);
 }
 
-.modal-enter-active, .modal-leave-active {
+.modal-fade-enter-active, .modal-fade-leave-active {
   transition: opacity 0.3s, transform 0.3s;
 }
 
-.modal-enter-from, .modal-leave-to {
+.modal-fade-enter-from, .modal-fade-leave-to {
   opacity: 0;
   transform: scale(0.95);
 }

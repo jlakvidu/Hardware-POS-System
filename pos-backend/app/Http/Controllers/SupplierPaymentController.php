@@ -110,6 +110,15 @@ class SupplierPaymentController extends Controller
 
         $groups = $query->orderByDesc('updated_at')->get();
 
+        // Add total_paid to each group (force collection for sum)
+        $groups = $groups->map(function ($group) {
+            // Debug: dump transactions
+            // \Log::info('Group ID: ' . $group->id . ' Transactions: ' . json_encode($group->transactions));
+            $transactions = collect($group->transactions);
+            $group->total_paid = $transactions->sum('amount_paid');
+            return $group;
+        });
+
         return response()->json($groups);
     }
 

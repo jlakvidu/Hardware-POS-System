@@ -498,292 +498,316 @@ const handleEditSubmit = () => {
                     </div>
                 </div>
                 
-                <div v-if="showModal"
-                    class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50">
-                    <div
-                        class="bg-gray-800 rounded-lg w-[600px] p-6 shadow-xl transform transition-all duration-300 scale-100 border border-gray-700/50">
-                        <div class="flex justify-between items-center mb-6 border-b border-gray-700 pb-4">
-                            <div class="flex items-center space-x-2">
-                                <div class="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-md">
-                                    <UserPlusIcon class="w-5 h-5 text-white" />
-                                </div>
-                                <h2 class="text-xl font-semibold">Add New Supplier</h2>
-                            </div>
-                            <button @click="showModal = false"
-                                class="text-gray-400 hover:text-gray-200 hover:bg-gray-700 p-2 rounded-full transition-colors">
-                                <XMarkIcon class="w-5 h-5" />
-                            </button>
-                        </div>
-                        <form @submit.prevent="handleAddSubmit" class="space-y-6">
-                            <div class="grid grid-cols-2 gap-6">
-                                <div class="col-span-2 bg-gray-750 p-4 rounded-lg space-y-4">
-                                    <h3 class="text-sm font-medium text-blue-400 uppercase tracking-wider mb-3">Supplier
-                                        Details</h3>
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-300 mb-1">Company Name</label>
-                                        <input v-model="newSupplier.companyName" 
-                                            @input="validateInput('companyName', newSupplier.companyName)"
-                                            type="text"
-                                            class="w-full px-4 py-2.5 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border"
-                                            :class="[
-                                                formErrors.companyName ? 'border-red-500' : 'border-gray-600',
-                                                !formErrors.companyName && newSupplier.companyName ? 'border-blue-500' : ''
-                                            ]"
-                                            placeholder="Enter company name" 
-                                            required>
-                                        <p v-if="formErrors.companyName" class="mt-1 text-sm text-red-500">{{ formErrors.companyName }}</p>
+                <transition name="modal-fade">
+                    <div v-if="showModal"
+                        class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50">
+                        <div
+                            class="bg-white/10 backdrop-blur-lg shadow-2xl rounded-2xl border border-blue-500/20 w-[500px] p-8 relative"
+                            style="box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);">
+                            <!-- Accent Bar -->
+                            <div class="absolute top-0 left-0 w-full h-2 rounded-t-2xl bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
+                            <div class="flex justify-between items-center mb-6 border-b border-gray-700 pb-4">
+                                <div class="flex items-center space-x-2">
+                                    <div class="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-md">
+                                        <UserPlusIcon class="w-5 h-5 text-white" />
                                     </div>
+                                    <h2 class="text-xl font-semibold">Add New Supplier</h2>
                                 </div>
-
-                                <div class="col-span-2 bg-gray-750 p-4 rounded-lg space-y-4">
-                                    <h3 class="text-sm font-medium text-blue-400 uppercase tracking-wider mb-3">Contact
-                                    </h3>
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-300 mb-1">Contact
-                                            Number</label>
-                                        <div class="relative">
-                                            <span
-                                                class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
-                                                <PhoneIcon class="w-5 h-5" />
-                                            </span>
-                                            <input v-model="newSupplier.contact" 
-                                                @input="validateInput('contact', newSupplier.contact)"
-                                                type="text"
-                                                class="w-full pl-10 pr-4 py-2.5 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border"
-                                                :class="[
-                                                    formErrors.contact ? 'border-red-500' : 'border-gray-600',
-                                                    !formErrors.contact && newSupplier.contact ? 'border-blue-500' : ''
-                                                ]"
-                                                placeholder="555-123-4567" 
-                                                required>
-                                        </div>
-                                        <p v-if="formErrors.contact" class="mt-1 text-sm text-red-500">{{ formErrors.contact }}</p>
-                                    </div>
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-300 mb-1">Email Address</label>
-                                        <div class="relative">
-                                            <span
-                                                class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
-                                                <EnvelopeIcon class="w-5 h-5" />
-                                            </span>
-                                            <input v-model="newSupplier.email" 
-                                                @input="validateInput('email', newSupplier.email)"
-                                                type="email"
-                                                class="w-full pl-10 pr-4 py-2.5 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border"
-                                                :class="[
-                                                    formErrors.email ? 'border-red-500' : 'border-gray-600',
-                                                    !formErrors.email && newSupplier.email ? 'border-blue-500' : ''
-                                                ]"
-                                                placeholder="example@company.com" 
-                                                required>
-                                        </div>
-                                        <p v-if="formErrors.email" class="mt-1 text-sm text-red-500">{{ formErrors.email }}</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-700">
-                                <button type="button" @click="showModal = false"
-                                    class="px-4 py-2.5 text-gray-300 hover:text-white bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors duration-200 flex items-center">
-                                    <XMarkIcon class="w-5 h-5 mr-2" />
-                                    Cancel
-                                </button>
-                                <button type="submit"
-                                    :disabled="!isValidNewSupplier || isAddingSupplier"
-                                    :class="[
-                                        'px-4 py-2.5 rounded-lg transition-all duration-300 flex items-center space-x-2',
-                                        isValidNewSupplier && !isAddingSupplier
-                                            ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-800 hover:shadow-lg hover:shadow-blue-500/30 text-white' 
-                                            : 'bg-gray-600 cursor-not-allowed text-gray-400'
-                                    ]">
-                                    <template v-if="isAddingSupplier">
-                                        <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                        <span>Adding Supplier...</span>
-                                    </template>
-                                    <template v-else>
-                                        <CheckIcon class="w-5 h-5" />
-                                        <span>Add Supplier</span>
-                                    </template>
+                                <button @click="showModal = false"
+                                    class="text-gray-400 hover:text-gray-200 hover:bg-gray-700 p-2 rounded-full transition-colors">
+                                    <XMarkIcon class="w-5 h-5" />
                                 </button>
                             </div>
-                        </form>
-                    </div>
-                </div>
-
-                <div v-if="showEditModal"
-                    class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50">
-                    <div
-                        class="bg-gray-800 rounded-lg w-[600px] p-6 shadow-xl transform transition-all duration-300 scale-100 border border-gray-700/50">
-                        <div class="flex justify-between items-center mb-6 border-b border-gray-700 pb-4">
-                            <div class="flex items-center space-x-2">
-                                <div class="p-2 bg-gradient-to-r from-purple-500 to-pink-600 rounded-md">
-                                    <PencilIcon class="w-5 h-5 text-white" />
-                                </div>
-                                <h2 class="text-xl font-semibold">Edit Supplier Details</h2>
-                            </div>
-                            <button @click="showEditModal = false"
-                                class="text-gray-400 hover:text-gray-200 hover:bg-gray-700 p-2 rounded-full transition-colors">
-                                <XMarkIcon class="w-5 h-5" />
-                            </button>
-                        </div>
-
-                        <form @submit.prevent="handleEditSubmit" class="space-y-6">
-                            <div class="grid grid-cols-2 gap-6">
-                                <div class="col-span-2 bg-gray-750 p-4 rounded-lg space-y-4">
-                                    <h3 class="text-sm font-medium text-purple-400 uppercase tracking-wider mb-3">Supplier
-                                        Details</h3>
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-300 mb-1">Company Name</label>
-                                        <input v-model="editingSupplier.companyName" 
-                                            @input="validateInput('companyName', editingSupplier.companyName)"
-                                            type="text"
-                                            class="w-full px-4 py-2.5 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border"
-                                            :class="[
-                                                formErrors.companyName ? 'border-red-500' : 'border-gray-600',
-                                                !formErrors.companyName && editingSupplier.companyName ? 'border-purple-500' : ''
-                                            ]"
-                                            placeholder="Enter company name" 
-                                            required>
-                                        <p v-if="formErrors.companyName" class="mt-1 text-sm text-red-500">{{ formErrors.companyName }}</p>
-                                    </div>
-                                </div>
-
-                                <div class="col-span-2 bg-gray-750 p-4 rounded-lg space-y-4">
-                                    <h3 class="text-sm font-medium text-purple-400 uppercase tracking-wider mb-3">Contact
-                                    </h3>
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-300 mb-1">Contact
-                                            Number</label>
-                                        <div class="relative">
-                                            <span
-                                                class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
-                                                <PhoneIcon class="w-5 h-5" />
-                                            </span>
-                                            <input v-model="editingSupplier.contact" 
-                                                @input="validateInput('contact', editingSupplier.contact)"
-                                                type="text"
-                                                class="w-full pl-10 pr-4 py-2.5 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border"
-                                                :class="[
-                                                    formErrors.contact ? 'border-red-500' : 'border-gray-600',
-                                                    !formErrors.contact && editingSupplier.contact ? 'border-purple-500' : ''
-                                                ]"
-                                                placeholder="555-123-4567" 
-                                                required>
+                            <form @submit.prevent="handleAddSubmit" class="space-y-6">
+                                <div class="grid grid-cols-2 gap-6">
+                                    <div class="col-span-2 bg-gray-750 p-4 rounded-lg space-y-4">
+                                        <h3 class="text-sm font-medium text-blue-400 uppercase tracking-wider mb-3">Supplier
+                                            Details</h3>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-300 mb-1">Company Name</label>
+                                            <div class="relative mb-6">
+                                                <input
+                                                    v-model="newSupplier.companyName"
+                                                    type="text"
+                                                    id="companyName"
+                                                    class="peer w-full bg-gray-800/80 border border-gray-600 rounded-lg px-4 pt-6 pb-2 text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500 transition-all"
+                                                    placeholder=" "
+                                                    required
+                                                />
+                                                <label
+                                                    for="companyName"
+                                                    class="absolute left-4 top-2 text-gray-400 text-sm transition-all peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-500 peer-focus:top-2 peer-focus:text-sm peer-focus:text-blue-400"
+                                                >
+                                                    Company Name
+                                                </label>
+                                            </div>
+                                            <p v-if="formErrors.companyName" class="mt-1 text-sm text-red-500">{{ formErrors.companyName }}</p>
                                         </div>
-                                        <p v-if="formErrors.contact" class="mt-1 text-sm text-red-500">{{ formErrors.contact }}</p>
                                     </div>
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-300 mb-1">Email Address</label>
-                                        <div class="relative">
-                                            <span
-                                                class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
-                                                <EnvelopeIcon class="w-5 h-5" />
-                                            </span>
-                                            <input v-model="editingSupplier.email" 
-                                                @input="validateInput('email', editingSupplier.email)"
-                                                type="email"
-                                                class="w-full pl-10 pr-4 py-2.5 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border"
-                                                :class="[
-                                                    formErrors.email ? 'border-red-500' : 'border-gray-600',
-                                                    !formErrors.email && editingSupplier.email ? 'border-purple-500' : ''
-                                                ]"
-                                                placeholder="example@company.com" 
-                                                required>
+
+                                    <div class="col-span-2 bg-gray-750 p-4 rounded-lg space-y-4">
+                                        <h3 class="text-sm font-medium text-blue-400 uppercase tracking-wider mb-3">Contact
+                                        </h3>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-300 mb-1">Contact
+                                                Number</label>
+                                            <div class="relative">
+                                                <span
+                                                    class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
+                                                    <PhoneIcon class="w-5 h-5" />
+                                                </span>
+                                                <input v-model="newSupplier.contact" 
+                                                    @input="validateInput('contact', newSupplier.contact)"
+                                                    type="text"
+                                                    class="w-full pl-10 pr-4 py-2.5 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border"
+                                                    :class="[
+                                                        formErrors.contact ? 'border-red-500' : 'border-gray-600',
+                                                        !formErrors.contact && newSupplier.contact ? 'border-blue-500' : ''
+                                                    ]"
+                                                    placeholder="555-123-4567" 
+                                                    required>
+                                            </div>
+                                            <p v-if="formErrors.contact" class="mt-1 text-sm text-red-500">{{ formErrors.contact }}</p>
                                         </div>
-                                        <p v-if="formErrors.email" class="mt-1 text-sm text-red-500">{{ formErrors.email }}</p>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-300 mb-1">Email Address</label>
+                                            <div class="relative">
+                                                <span
+                                                    class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
+                                                    <EnvelopeIcon class="w-5 h-5" />
+                                                </span>
+                                                <input v-model="newSupplier.email" 
+                                                    @input="validateInput('email', newSupplier.email)"
+                                                    type="email"
+                                                    class="w-full pl-10 pr-4 py-2.5 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border"
+                                                    :class="[
+                                                        formErrors.email ? 'border-red-500' : 'border-gray-600',
+                                                        !formErrors.email && newSupplier.email ? 'border-blue-500' : ''
+                                                    ]"
+                                                    placeholder="example@company.com" 
+                                                    required>
+                                            </div>
+                                            <p v-if="formErrors.email" class="mt-1 text-sm text-red-500">{{ formErrors.email }}</p>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                            <div class="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-700">
-                                <button type="button" @click="showEditModal = false"
-                                    class="px-4 py-2.5 text-gray-300 hover:text-white bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors duration-200 flex items-center">
-                                    <XMarkIcon class="w-5 h-5 mr-2" />
-                                    Cancel
-                                </button>
-                                <button type="submit"
-                                    :disabled="!isValidEditSupplier || isUpdatingSupplier"
-                                    :class="[
-                                        'px-4 py-2.5 rounded-lg transition-all duration-300 flex items-center space-x-2',
-                                        isValidEditSupplier && !isUpdatingSupplier
-                                            ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 hover:shadow-lg hover:shadow-purple-500/30 text-white' 
-                                            : 'bg-gray-600 cursor-not-allowed text-gray-400'
-                                    ]">
-                                    <template v-if="isUpdatingSupplier">
-                                        <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                        <span>Updating Supplier...</span>
-                                    </template>
-                                    <template v-else>
-                                        <CheckIcon class="w-5 h-5" />
-                                        <span>Update Supplier</span>
-                                    </template>
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-
-                <div v-if="showViewModal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50">
-                    <div class="bg-gradient-to-b from-gray-800 to-gray-900 rounded-lg w-[500px] p-6 shadow-xl border border-gray-700/50">
-                        <div class="flex justify-between items-center mb-6 border-b border-gray-700/50 pb-4">
-                            <div class="flex items-center space-x-2">
-                                <div class="p-2 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-md">
-                                    <EyeIcon class="w-5 h-5 text-white" />
+                                <div class="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-700">
+                                    <button type="button" @click="showModal = false"
+                                        class="px-4 py-2.5 text-gray-300 hover:text-white bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors duration-200 flex items-center">
+                                        <XMarkIcon class="w-5 h-5 mr-2" />
+                                        Cancel
+                                    </button>
+                                    <button type="submit"
+                                        :disabled="!isValidNewSupplier || isAddingSupplier"
+                                        :class="[
+                                            'px-4 py-2.5 rounded-lg transition-all duration-300 flex items-center space-x-2',
+                                            isValidNewSupplier && !isAddingSupplier
+                                                ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-800 hover:shadow-lg hover:shadow-blue-500/30 text-white' 
+                                                : 'bg-gray-600 cursor-not-allowed text-gray-400'
+                                        ]">
+                                        <template v-if="isAddingSupplier">
+                                            <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            <span>Adding Supplier...</span>
+                                        </template>
+                                        <template v-else>
+                                            <CheckIcon class="w-5 h-5" />
+                                            <span>Add Supplier</span>
+                                        </template>
+                                    </button>
                                 </div>
-                                <h2 class="text-xl font-semibold text-cyan-400">Supplier Details</h2>
-                            </div>
-                            <button @click="closeViewModal"
-                                class="text-gray-400 hover:text-gray-200 hover:bg-gray-700 p-2 rounded-full transition-colors">
-                                <XMarkIcon class="w-5 h-5" />
-                            </button>
-                        </div>
-
-                        <div class="space-y-4" v-if="viewingSupplier">
-                            <div class="bg-gray-800/50 backdrop-blur-sm p-4 rounded-lg border border-gray-700/30 hover:border-blue-500/50 transition-colors duration-300">
-                                <h3 class="text-sm font-medium text-blue-400 uppercase mb-2">Supplier ID</h3>
-                                <p class="text-white flex items-center">
-                                    <span class="inline-block w-6 h-6 bg-gray-700 rounded-full mr-2 flex items-center justify-center text-xs text-blue-400">#</span>
-                                    {{ viewingSupplier.id }}
-                                </p>
-                            </div>
-                            
-                            <div class="bg-gray-800/50 backdrop-blur-sm p-4 rounded-lg border border-gray-700/30 hover:border-blue-500/50 transition-colors duration-300">
-                                <h3 class="text-sm font-medium text-blue-400 uppercase mb-2">Company Name</h3>
-                                <p class="text-white flex items-center">
-                                    <BuildingOfficeIcon class="w-5 h-5 text-gray-400 mr-2" />
-                                    {{ viewingSupplier.companyName }}
-                                </p>
-                            </div>
-                            
-                            <div class="bg-gray-800/50 backdrop-blur-sm p-4 rounded-lg border border-gray-700/30 hover:border-blue-500/50 transition-colors duration-300">
-                                <h3 class="text-sm font-medium text-blue-400 uppercase mb-2">Contact Number</h3>
-                                <p class="text-white flex items-center">
-                                    <PhoneIcon class="w-5 h-5 text-gray-400 mr-2" />
-                                    {{ viewingSupplier.contact }}
-                                </p>
-                            </div>
-                            
-                            <div class="bg-gray-800/50 backdrop-blur-sm p-4 rounded-lg border border-gray-700/30 hover:border-blue-500/50 transition-colors duration-300">
-                                <h3 class="text-sm font-medium text-blue-400 uppercase mb-2">Email Address</h3>
-                                <p class="text-white flex items-center">
-                                    <EnvelopeIcon class="w-5 h-5 text-gray-400 mr-2" />
-                                    {{ viewingSupplier.email }}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div class="flex justify-end mt-6 pt-4 border-t border-gray-700">
-                            <button @click="closeViewModal"
-                                class="px-4 py-2 bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 text-white rounded-md transition-all duration-300 hover:shadow-lg hover:shadow-gray-500/30">
-                                Close
-                            </button>
+                            </form>
                         </div>
                     </div>
-                </div>
+                </transition>
+
+                <transition name="modal-fade">
+                    <div v-if="showEditModal"
+                        class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50">
+                        <div
+                            class="bg-white/10 backdrop-blur-lg shadow-2xl rounded-2xl border border-blue-500/20 w-[500px] p-8 relative"
+                            style="box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);">
+                            <!-- Accent Bar -->
+                            <div class="absolute top-0 left-0 w-full h-2 rounded-t-2xl bg-gradient-to-r from-purple-500 to-pink-600"></div>
+                            <div class="flex justify-between items-center mb-6 border-b border-gray-700 pb-4">
+                                <div class="flex items-center space-x-2">
+                                    <div class="p-2 bg-gradient-to-r from-purple-500 to-pink-600 rounded-md">
+                                        <PencilIcon class="w-5 h-5 text-white" />
+                                    </div>
+                                    <h2 class="text-xl font-semibold">Edit Supplier Details</h2>
+                                </div>
+                                <button @click="showEditModal = false"
+                                    class="text-gray-400 hover:text-gray-200 hover:bg-gray-700 p-2 rounded-full transition-colors">
+                                    <XMarkIcon class="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <form @submit.prevent="handleEditSubmit" class="space-y-6">
+                                <div class="grid grid-cols-2 gap-6">
+                                    <div class="col-span-2 bg-gray-750 p-4 rounded-lg space-y-4">
+                                        <h3 class="text-sm font-medium text-purple-400 uppercase tracking-wider mb-3">Supplier
+                                            Details</h3>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-300 mb-1">Company Name</label>
+                                            <div class="relative mb-6">
+                                                <input
+                                                    v-model="editingSupplier.companyName"
+                                                    type="text"
+                                                    id="companyName"
+                                                    class="peer w-full bg-gray-800/80 border border-gray-600 rounded-lg px-4 pt-6 pb-2 text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-500 transition-all"
+                                                    placeholder=" "
+                                                    required
+                                                />
+                                                <label
+                                                    for="companyName"
+                                                    class="absolute left-4 top-2 text-gray-400 text-sm transition-all peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-500 peer-focus:top-2 peer-focus:text-sm peer-focus:text-purple-400"
+                                                >
+                                                    Company Name
+                                                </label>
+                                            </div>
+                                            <p v-if="formErrors.companyName" class="mt-1 text-sm text-red-500">{{ formErrors.companyName }}</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-span-2 bg-gray-750 p-4 rounded-lg space-y-4">
+                                        <h3 class="text-sm font-medium text-purple-400 uppercase tracking-wider mb-3">Contact
+                                        </h3>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-300 mb-1">Contact
+                                                Number</label>
+                                            <div class="relative">
+                                                <span
+                                                    class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
+                                                    <PhoneIcon class="w-5 h-5" />
+                                                </span>
+                                                <input v-model="editingSupplier.contact" 
+                                                    @input="validateInput('contact', editingSupplier.contact)"
+                                                    type="text"
+                                                    class="w-full pl-10 pr-4 py-2.5 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border"
+                                                    :class="[
+                                                        formErrors.contact ? 'border-red-500' : 'border-gray-600',
+                                                        !formErrors.contact && editingSupplier.contact ? 'border-purple-500' : ''
+                                                    ]"
+                                                    placeholder="555-123-4567" 
+                                                    required>
+                                            </div>
+                                            <p v-if="formErrors.contact" class="mt-1 text-sm text-red-500">{{ formErrors.contact }}</p>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-300 mb-1">Email Address</label>
+                                            <div class="relative">
+                                                <span
+                                                    class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
+                                                    <EnvelopeIcon class="w-5 h-5" />
+                                                </span>
+                                                <input v-model="editingSupplier.email" 
+                                                    @input="validateInput('email', editingSupplier.email)"
+                                                    type="email"
+                                                    class="w-full pl-10 pr-4 py-2.5 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border"
+                                                    :class="[
+                                                        formErrors.email ? 'border-red-500' : 'border-gray-600',
+                                                        !formErrors.email && editingSupplier.email ? 'border-purple-500' : ''
+                                                    ]"
+                                                    placeholder="example@company.com" 
+                                                    required>
+                                            </div>
+                                            <p v-if="formErrors.email" class="mt-1 text-sm text-red-500">{{ formErrors.email }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-700">
+                                    <button type="button" @click="showEditModal = false"
+                                        class="px-4 py-2.5 text-gray-300 hover:text-white bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors duration-200 flex items-center">
+                                        <XMarkIcon class="w-5 h-5 mr-2" />
+                                        Cancel
+                                    </button>
+                                    <button type="submit"
+                                        :disabled="!isValidEditSupplier || isUpdatingSupplier"
+                                        :class="[
+                                            'px-4 py-2.5 rounded-lg transition-all duration-300 flex items-center space-x-2',
+                                            isValidEditSupplier && !isUpdatingSupplier
+                                                ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 hover:shadow-lg hover:shadow-purple-500/30 text-white' 
+                                                : 'bg-gray-600 cursor-not-allowed text-gray-400'
+                                        ]">
+                                        <template v-if="isUpdatingSupplier">
+                                            <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            <span>Updating Supplier...</span>
+                                        </template>
+                                        <template v-else>
+                                            <CheckIcon class="w-5 h-5" />
+                                            <span>Update Supplier</span>
+                                        </template>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </transition>
+
+                <transition name="modal-fade">
+                    <div v-if="showViewModal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50">
+                        <div class="bg-gradient-to-b from-gray-800 to-gray-900 rounded-lg w-[500px] p-6 shadow-xl border border-gray-700/50">
+                            <div class="flex justify-between items-center mb-6 border-b border-gray-700/50 pb-4">
+                                <div class="flex items-center space-x-2">
+                                    <div class="p-2 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-md">
+                                        <EyeIcon class="w-5 h-5 text-white" />
+                                    </div>
+                                    <h2 class="text-xl font-semibold text-cyan-400">Supplier Details</h2>
+                                </div>
+                                <button @click="closeViewModal"
+                                    class="text-gray-400 hover:text-gray-200 hover:bg-gray-700 p-2 rounded-full transition-colors">
+                                    <XMarkIcon class="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <div class="space-y-4" v-if="viewingSupplier">
+                                <div class="bg-gray-800/50 backdrop-blur-sm p-4 rounded-lg border border-gray-700/30 hover:border-blue-500/50 transition-colors duration-300">
+                                    <h3 class="text-sm font-medium text-blue-400 uppercase mb-2">Supplier ID</h3>
+                                    <p class="text-white flex items-center">
+                                        <span class="inline-block w-6 h-6 bg-gray-700 rounded-full mr-2 flex items-center justify-center text-xs text-blue-400">#</span>
+                                        {{ viewingSupplier.id }}
+                                    </p>
+                                </div>
+                                
+                                <div class="bg-gray-800/50 backdrop-blur-sm p-4 rounded-lg border border-gray-700/30 hover:border-blue-500/50 transition-colors duration-300">
+                                    <h3 class="text-sm font-medium text-blue-400 uppercase mb-2">Company Name</h3>
+                                    <p class="text-white flex items-center">
+                                        <BuildingOfficeIcon class="w-5 h-5 text-gray-400 mr-2" />
+                                        {{ viewingSupplier.companyName }}
+                                    </p>
+                                </div>
+                                
+                                <div class="bg-gray-800/50 backdrop-blur-sm p-4 rounded-lg border border-gray-700/30 hover:border-blue-500/50 transition-colors duration-300">
+                                    <h3 class="text-sm font-medium text-blue-400 uppercase mb-2">Contact Number</h3>
+                                    <p class="text-white flex items-center">
+                                        <PhoneIcon class="w-5 h-5 text-gray-400 mr-2" />
+                                        {{ viewingSupplier.contact }}
+                                    </p>
+                                </div>
+                                
+                                <div class="bg-gray-800/50 backdrop-blur-sm p-4 rounded-lg border border-gray-700/30 hover:border-blue-500/50 transition-colors duration-300">
+                                    <h3 class="text-sm font-medium text-blue-400 uppercase mb-2">Email Address</h3>
+                                    <p class="text-white flex items-center">
+                                        <EnvelopeIcon class="w-5 h-5 text-gray-400 mr-2" />
+                                        {{ viewingSupplier.email }}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="flex justify-end mt-6 pt-4 border-t border-gray-700">
+                                <button @click="closeViewModal"
+                                    class="px-4 py-2 bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 text-white rounded-md transition-all duration-300 hover:shadow-lg hover:shadow-gray-500/30">
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </transition>
             </div>
         </div>
     </div>
@@ -853,11 +877,10 @@ tbody tr:hover {
   background-color: rgba(31, 41, 55, 0.5);
 }
 
-.modal-enter-active, .modal-leave-active {
+.modal-fade-enter-active, .modal-fade-leave-active {
   transition: opacity 0.3s, transform 0.3s;
 }
-
-.modal-enter-from, .modal-leave-to {
+.modal-fade-enter-from, .modal-fade-leave-to {
   opacity: 0;
   transform: scale(0.95);
 }

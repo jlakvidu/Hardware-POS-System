@@ -1454,95 +1454,78 @@ const submitSupplierPayment = async () => {
     />
 
     <div v-if="showExportOptions"
-      class="flex bg-black/80 justify-center p-4 backdrop-blur-sm fixed inset-0 items-center z-50">
-      <div
-        class="bg-gradient-to-br border border-gray-700/50 p-6 rounded-2xl shadow-2xl w-full animate-fade-in from-gray-900/95 max-w-md to-gray-800/95">
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+      <div class="relative w-full max-w-md rounded-2xl bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border border-gray-700/60 shadow-2xl p-8 animate-fade-in">
         <!-- Header -->
-        <div class="flex justify-between items-start mb-6">
-          <div class="flex gap-4 items-center">
-            <div
-              class="bg-gradient-to-br border border-indigo-500/20 p-3 rounded-xl shadow-lg from-indigo-600/10 to-indigo-700/10">
-              <ArrowDownTrayIcon class="h-6 text-indigo-400 w-6" />
-            </div>
-            <div>
-              <h3 class="text-2xl text-white font-bold mb-1">Export Report</h3>
-              <p class="text-gray-400 text-sm">Choose your preferred format</p>
-            </div>
+        <div class="flex items-center gap-4 mb-6">
+          <div class="bg-indigo-600/10 p-3 rounded-xl border border-indigo-500/20">
+            <ArrowDownTrayIcon class="h-7 w-7 text-indigo-400" />
           </div>
-          <button @click="exportInventory"
-            class="bg-gradient-to-br border border-indigo-500/20 p-4 rounded-xl duration-200 from-indigo-600/10 group hover:from-indigo-600/20 hover:to-indigo-700/20 relative to-indigo-700/10 transition-all">
-            <div class="flex flex-col gap-3 items-center">
-              <div class="bg-indigo-500/10 border border-indigo-500/20 p-3 rounded-lg">
-                <ArrowDownTrayIcon class="h-8 text-indigo-400 w-8" />
-              </div>
-              <div class="text-center">
-                <h4 class="text-white font-semibold mb-1">Excel Format</h4>
-                <p class="text-gray-400 text-sm">Spreadsheet report</p>
-              </div>
-            </div>
-            <div
-              class="border border-indigo-500/0 rounded-xl absolute duration-200 group-hover:border-indigo-500/50 inset-0 transition-all">
-            </div>
-          </button>
+          <div>
+            <h3 class="text-2xl font-bold text-white mb-1">Export Report</h3>
+            <p class="text-gray-400 text-sm">Choose your preferred format</p>
+          </div>
+        </div>
 
+        <!-- Format Options -->
+        <div class="flex gap-4 mb-6">
+          <button @click="exportInventory"
+            class="flex-1 flex flex-col items-center p-4 rounded-xl border-2 border-indigo-500/30 bg-gray-800/60 hover:border-indigo-400 transition-all shadow group">
+            <ArrowDownTrayIcon class="h-8 w-8 text-indigo-400 mb-2" />
+            <span class="text-white font-semibold">Excel Format</span>
+            <span class="text-xs text-gray-400">Spreadsheet report</span>
+          </button>
           <button @click="exportToPDF"
-            class="bg-gradient-tobr border border-red-500/20 p-4 rounded-xl duration-200 from-red-600/10 group hover:from-red-600/20 hover:to-red-700/20 relative to-red-700/10 transition-all">
-            <div class="flex flex-col gap-3 items-center">
-              <div class="bg-red-500/10 border border-red-500/20 p-3 rounded-lg">
-                <svg class="h-8 text-red-400 w-8" viewBox="0 0 24 24" fill="none">
-                  <path d="M7 18H17V16H7V18Z" fill="currentColor" />
-                  <path d
-                    fill="currentColor" />
-                </svg>
-              </div>
-              <div class="text-center">
-                <h4 class="text-white font-semibold mb-1">PDF Format</h4>
-                <p class="text-gray-400 text-sm">Professional report</p>
-              </div>
-            </div>
-            <div
-              class="border border-red-500/0 rounded-xl absolute duration-200 group-hover:border-red-500/50 inset-0 transition-all">
-            </div>
+            class="flex-1 flex flex-col items-center p-4 rounded-xl border-2 border-red-500/30 bg-gray-800/60 hover:border-red-400 transition-all shadow group">
+            <svg class="h-8 w-8 text-red-400 mb-2" fill="none" viewBox="0 0 24 24">
+              <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
+              <path d="M12 8v8m0 0l-3-3m3 3l3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span class="text-white font-semibold">PDF Format</span>
+            <span class="text-xs text-gray-400">Professional report</span>
           </button>
         </div>
 
+        <!-- Divider -->
+        <div class="border-t border-gray-700/50 my-6"></div>
+
         <!-- Features List -->
-        <div class="bg-gray-800/50 border border-gray-700/50 p-4 rounded-xl space-y-3">
-          <h4 class="text-gray-300 font-medium mb-2">Report Features:</h4>
-          <div class="flex text-sm gap-2 items-center">
-            <CheckIcon class="h-5 text-emerald-400 w-5" />
-            <span class="text-gray-300">Executive summary with key metrics</span>
-          </div>
-          <div class="flex text-sm gap-2 items-center">
-            <CheckIcon class="h-5 text-emerald-400 w-5" />
-            <span class="text-gray-300">Detailed inventory breakdown</span>
-          </div>
-          <div class="flex text-sm gap-2 items-center">
-            <CheckIcon class="h-5 text-emerald-400 w-5" />
-            <span class="text-gray-300">Stock value analysis</span>
-          </div>
-          <div class="flex text-sm gap-2 items-center">
-                       <CheckIcon class="h-5 text-emerald-400 w-5" />
-            <span class="text-gray-300">Low stock alerts</span>
-          </div>
+        <div class="bg-gray-800/70 rounded-xl p-4 mb-6">
+          <h4 class="text-gray-300 font-medium mb-3">Report Features:</h4>
+          <ul class="space-y-2">
+            <li class="flex items-center gap-2">
+              <CheckIcon class="h-5 w-5 text-emerald-400" />
+              <span class="text-gray-300">Executive summary with key metrics</span>
+            </li>
+            <li class="flex items-center gap-2">
+              <CheckIcon class="h-5 w-5 text-emerald-400" />
+              <span class="text-gray-300">Detailed inventory breakdown</span>
+            </li>
+            <li class="flex items-center gap-2">
+              <CheckIcon class="h-5 w-5 text-emerald-400" />
+              <span class="text-gray-300">Stock value analysis</span>
+            </li>
+            <li class="flex items-center gap-2">
+              <CheckIcon class="h-5 w-5 text-emerald-400" />
+              <span class="text-gray-300">Low stock alerts</span>
+            </li>
+          </ul>
         </div>
 
         <!-- Footer -->
-        <div class="border-gray-700/50 border-t mt-6 pt-6">
-          <div class="flex justify-between text-sm items-center">
-            <span class="text-gray-400">Report will include {{ filteredInventory.length }} items</span>
-            <button @click="showExportOptions = false"
-              class="rounded-lg text-gray-400 hover:bg-gray-700/50 hover:text-gray-300 px-4 py-2 transition-colors">
-              Cancel
-            </button>
-          </div>
+        <div class="flex items-center justify-between border-t border-gray-700/50 pt-4">
+          <span class="text-gray-400 text-sm">Report will include {{ filteredInventory.length }} items</span>
+          <button @click="showExportOptions = false"
+            class="px-4 py-2 rounded-lg text-gray-400 hover:bg-gray-700/50 hover:text-gray-300 transition-colors">
+            Cancel
+          </button>
         </div>
 
         <!-- Loading Overlay -->
         <div v-if="isExporting"
-          class="flex bg-gray-900/50 justify-center rounded-2xl absolute backdrop-blur-sm inset-0 items-center">
+          class="absolute inset-0 flex items-center justify-center bg-gray-900/70 rounded-2xl">
           <div class="text-center">
-            <svg class="h-8 text-indigo-500 w-8 animate-spin mb-3 mx-auto" xmlns="http://www.w3.org/2000/svg"
+            <svg class="h-8 w-8 text-indigo-500 animate-spin mb-3 mx-auto" xmlns="http://www.w3.org/2000/svg"
               fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             </svg>
@@ -1711,79 +1694,105 @@ const submitSupplierPayment = async () => {
               leaveTo="opacity-0 scale-95"
             >
               <DialogPanel class="w-full max-w-6xl transform overflow-hidden rounded-2xl bg-gradient-to-br from-gray-800 via-gray-900 to-black p-6 text-left align-middle shadow-xl transition-all border border-gray-700/50">
-                <!-- Progress indicator -->
-                <div class="mb-8">
-                  <div class="flex items-center justify-between px-2">
-                    <span class="text-sm font-medium text-emerald-400">{{ currentStep === 1 ? 'Inventory Details' : 'Product Information' }}</span>
-                    <span class="text-sm text-gray-400">Step {{ currentStep }} of 2</span>
-                  </div>
-                  <div class="mt-2 h-2 w-full rounded-full bg-gray-700">
-                    <div
-                      class="h-2 rounded-full transition-all duration-500 ease-in-out"
-                      :class="currentStep === 1 ? 'w-1/2 bg-gradient-to-r from-emerald-500 to-emerald-400' : 'w-full bg-gradient-to-r from-emerald-500 via-blue-500 to-indigo-500'"
-                    ></div>
+                <!-- Stepper Header -->
+                <div class="flex flex-col items-center mb-8 w-full">
+                  <div class="flex items-center justify-center gap-8 w-full">
+                    <!-- Step 1 -->
+                    <div class="flex flex-col items-center">
+                      <div :class="[
+                        'flex items-center justify-center rounded-full w-9 h-9 text-lg font-bold border-2',
+                        currentStep === 1 ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg' : 'bg-gray-800 text-gray-400 border-gray-600'
+                      ]">
+                        1
+                      </div>
+                      <span :class="[
+                        'mt-2 text-sm font-semibold',
+                        currentStep === 1 ? 'text-emerald-400' : 'text-gray-400'
+                      ]">Inventory Details</span>
+                    </div>
+                    <!-- Progress Bar -->
+                    <div class="flex-1 h-1 mx-2 relative">
+                      <div class="absolute top-1/2 left-0 w-full h-1 bg-gray-700 rounded-full -translate-y-1/2"></div>
+                      <div
+                        class="absolute top-1/2 left-0 h-1 rounded-full -translate-y-1/2 transition-all duration-500"
+                        :class="currentStep === 1 ? 'w-1/2 bg-gradient-to-r from-emerald-400 to-blue-400' : 'w-full bg-gradient-to-r from-emerald-400 via-blue-400 to-indigo-500'"
+                      ></div>
+                    </div>
+                    <!-- Step 2 -->
+                    <div class="flex flex-col items-center">
+                      <div :class="[
+                        'flex items-center justify-center rounded-full w-9 h-9 text-lg font-bold border-2',
+                        currentStep === 2 ? 'bg-indigo-500 text-white border-indigo-500 shadow-lg' : 'bg-gray-800 text-gray-400 border-gray-600'
+                      ]">
+                        2
+                      </div>
+                      <span :class="[
+                        'mt-2 text-sm font-semibold',
+                        currentStep === 2 ? 'text-indigo-400' : 'text-gray-400'
+                      ]">Product Information</span>
+                    </div>
                   </div>
                 </div>
 
-                <!-- Rest of your new modal content -->
+                <!-- Step 1 Content -->
                 <div v-if="currentStep === 1" class="space-y-6">
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <FormField>
-                      <FormLabel>Quantity</FormLabel>
-                      <input v-model="newItem.quantity" type="number" class="form-input" required />
+                      <FormLabel>Quantity <span class="text-red-500">*</span></FormLabel>
+                      <input v-model="newItem.quantity" type="number" class="form-input" required placeholder="Enter quantity" />
                     </FormField>
                     <FormField>
-                      <FormLabel>Restock Date & Time</FormLabel>
+                      <FormLabel>Restock Date & Time <span class="text-red-500">*</span></FormLabel>
                       <input v-model="newItem.restock_date_time" type="datetime-local" class="form-input" />
                     </FormField>
                     <FormField>
-                      <FormLabel>Added Stock Amount</FormLabel>
-                      <input v-model="newItem.added_stock_amount" type="number" class="form-input" />
+                      <FormLabel>Added Stock Amount <span class="text-red-500">*</span></FormLabel>
+                      <input v-model="newItem.added_stock_amount" type="number" class="form-input" placeholder="0" />
                     </FormField>
                   </div>
-                  <div class="flex justify-end space-x-3 mt-6">
+                  <div class="flex justify-end gap-3 mt-8">
                     <button @click="showMultiStepModal = false" class="btn-secondary">Cancel</button>
-                    <button @click="saveNewItem" :disabled="isAddingInventory" class="btn-primary">
+                    <button @click="saveNewItem" :disabled="isAddingInventory || !newItem.quantity" class="btn-primary">
                       {{ isAddingInventory ? 'Saving...' : 'Next' }}
                     </button>
                   </div>
                 </div>
 
                 <div v-if="currentStep === 2" class="space-y-6">
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <FormField>
-                      <FormLabel>Product Name</FormLabel>
-                      <input v-model="newProduct.name" type="text" class="form-input" required />
+                      <FormLabel>Product Name <span class="text-red-500">*</span></FormLabel>
+                      <input v-model="newProduct.name" type="text" class="form-input" required placeholder="e.g. Banner 13" />
                     </FormField>
                     <FormField>
-                      <FormLabel>Model</FormLabel>
-                      <input v-model="newProduct.model" type="text" class="form-input" required />
+                      <FormLabel>Model <span class="text-red-500">*</span></FormLabel>
+                      <input v-model="newProduct.model" type="text" class="form-input" required placeholder="e.g. STV" />
                     </FormField>
                     <FormField>
-                      <FormLabel>Price</FormLabel>
-                      <input v-model="newProduct.price" type="number" step="0.01" class="form-input" required />
+                      <FormLabel>Price <span class="text-red-500">*</span></FormLabel>
+                      <input v-model="newProduct.price" type="number" step="0.01" class="form-input" required placeholder="e.g. 1000.00" />
                     </FormField>
                     <FormField>
-                      <FormLabel>Supplier ID</FormLabel>
-                      <input v-model="newProduct.supplier_id" type="number" class="form-input" required />
+                      <FormLabel>Supplier ID <span class="text-red-500">*</span></FormLabel>
+                      <input v-model="newProduct.supplier_id" type="number" class="form-input" required placeholder="e.g. 1" />
                     </FormField>
                   </div>
-                  <div class="flex justify-end space-x-3 mt-6">
+                  <div class="flex justify-end gap-3 mt-8">
                     <button @click="currentStep = 1" class="btn-secondary">Back</button>
                     <button @click="saveNewProduct" :disabled="isSavingProduct" class="btn-primary">
                       <template v-if="isSavingProduct">
-        <svg class="h-5 w-5 animate-spin mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor"
-            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-          </path>
-        </svg>
-        Saving...
-      </template>
-      <template v-else>
-        Save Product
-      </template>
-    </button>
+                        <svg class="h-5 w-5 animate-spin mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                          <path class="opacity-75" fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                          </path>
+                        </svg>
+                        Saving...
+                      </template>
+                      <template v-else>
+                        Save Product
+                      </template>
+                    </button>
                   </div>
                 </div>
               </DialogPanel>
@@ -1845,20 +1854,22 @@ const submitSupplierPayment = async () => {
     </div>
 
     <!-- Supplier Payment Modal -->
-    <div v-if="showPaymentModal" class="flex bg-black/80 justify-center p-4 backdrop-blur-sm fixed inset-0 items-center z-50">
-      <div class="bg-gradient-to-br border border-gray-700/50 p-6 rounded-2xl shadow-2xl w-full max-w-md animate-fade-in from-gray-900/95 to-gray-800/95">
-        <div class="flex justify-between items-center mb-6">
+    <div v-if="showPaymentModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+      <div class="relative w-full max-w-md rounded-2xl bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border border-gray-700/60 shadow-2xl p-8 animate-fade-in">
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-6">
           <div>
-            <h2 class="text-2xl text-white font-bold mb-1">Supplier Payment</h2>
+            <h2 class="text-2xl font-bold text-white mb-1">Supplier Payment</h2>
             <p class="text-gray-400 text-sm">Pay supplier for the selected product</p>
           </div>
           <button @click="showPaymentModal = false" class="p-2 rounded-lg hover:bg-gray-700/50 transition-colors">
-            <XMarkIcon class="h-5 text-gray-400 w-5" />
+            <XMarkIcon class="h-5 w-5 text-gray-400" />
           </button>
         </div>
-        <!-- Payment History Section -->
-        <div v-if="paymentTransactions.length > 0" class="mb-4">
-          <div class="bg-gray-800/70 border border-gray-700/50 rounded-lg p-3">
+
+        <!-- Payment History -->
+        <div v-if="paymentTransactions.length > 0" class="mb-6">
+          <div class="bg-gray-800/80 border border-gray-700/50 rounded-lg p-4">
             <h3 class="text-gray-300 text-sm font-semibold mb-2">Payment History</h3>
             <table class="w-full text-xs text-gray-300">
               <thead>
@@ -1871,19 +1882,15 @@ const submitSupplierPayment = async () => {
               <tbody>
                 <tr v-for="t in paymentTransactions" :key="t.id">
                   <td>{{ new Date(t.paid_at).toLocaleString() }}</td>
-                  <td>{{ t.payment_method }}</td>
+                  <td class="capitalize">{{ t.payment_method }}</td>
                   <td class="text-right">Rs. {{ Number(t.amount_paid).toLocaleString() }}</td>
                 </tr>
               </tbody>
-              <tfoot>
-                <tr>
-                  <td colspan="2" class="text-right font-semibold">Total Paid:</td>
-                  <td class="text-right font-semibold">Rs. {{ Number(previousPaymentsTotal).toLocaleString() }}</td>
-                </tr>
-              </tfoot>
             </table>
           </div>
         </div>
+
+        <!-- Payment Form -->
         <form @submit.prevent="submitSupplierPayment" class="space-y-4">
           <div>
             <label class="form-label">Total Cost</label>
@@ -1902,27 +1909,32 @@ const submitSupplierPayment = async () => {
               <option value="check">Check</option>
             </select>
           </div>
-          <div v-if="paymentDetails.payment_method === 'check'">
-            <label class="form-label">Check Number</label>
-            <input v-model="paymentDetails.check_number" type="text" class="form-input" required />
-            <label class="form-label">Bank Name</label>
-            <input v-model="paymentDetails.bank_name" type="text" class="form-input" required />
+          <div v-if="paymentDetails.payment_method === 'check'" class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="form-label">Check Number</label>
+              <input v-model="paymentDetails.check_number" type="text" class="form-input" required />
+            </div>
+            <div>
+              <label class="form-label">Bank Name</label>
+              <input v-model="paymentDetails.bank_name" type="text" class="form-input" required />
+            </div>
           </div>
           <div>
             <label class="form-label">Notes</label>
             <input v-model="paymentDetails.notes" type="text" class="form-input" placeholder="Optional" />
           </div>
-          <div v-if="remainingBalance !== null">
-            <div class="text-yellow-400 font-semibold" v-if="remainingBalance > 0">
+          <div v-if="remainingBalance !== null" class="mt-2">
+            <div v-if="remainingBalance > 0" class="text-yellow-400 font-semibold">
               Remaining Balance: Rs. {{ Number(remainingBalance).toLocaleString() }}
             </div>
-            <div class="text-green-400 font-semibold" v-else>
+            <div v-else class="text-green-400 font-semibold">
               No remaining balance. Payment complete.
             </div>
             <div class="text-gray-400 text-sm">
               Payment Status: <span :class="paymentStatus === 'full' ? 'text-green-400' : 'text-yellow-400'">{{ paymentStatus }}</span>
             </div>
           </div>
+          <!-- Footer Buttons -->
           <div class="flex justify-end gap-3 mt-6">
             <button @click="showPaymentModal = false" type="button" class="btn-secondary">Cancel</button>
             <button type="submit" :disabled="isPayingSupplier || remainingBalance === 0" class="btn-primary">
