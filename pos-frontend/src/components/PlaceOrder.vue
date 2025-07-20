@@ -736,9 +736,9 @@ const customerName = ref('Select Customer')
 const filteredCustomers = computed(() => {
   const query = customerSearchQuery.value.toLowerCase()
   return customers.value.filter(customer => 
-    customer.name.toLowerCase().includes(query) || 
-    customer.phone?.toLowerCase().includes(query) ||
-    customer.email?.toLowerCase().includes(query)
+    customer.name.toLowerCase().includes(query) ||
+    customer.email?.toLowerCase().includes(query) ||
+    customer.id.toString().includes(query)
   )
 })
 
@@ -1016,7 +1016,17 @@ watch(() => total.value, (newTotal) => {
                   <div class="flex-1 min-w-0">
                     <div class="flex justify-between">
                       <div class="font-medium text-sm truncate text-white">{{ item.name }}</div>
-                      <div class="text-blue-400 text-xs font-bold">Rs. {{ item.price.toLocaleString() }}</div>
+                      <!-- Editable price input with Rs. before the input -->
+                      <div>
+                        <span class="text-blue-400 text-xs font-bold mr-1">Rs.</span>
+                        <input
+                          type="number"
+                          v-model.number="item.price"
+                          min="0"
+                          class="w-20 bg-gray-700/50 border border-gray-600/50 rounded-lg px-2 py-1 text-xs text-blue-400 font-bold text-right focus:outline-none focus:ring-1 focus:ring-blue-400/30"
+                          style="width: 80px;"
+                        />
+                      </div>
                     </div>
 
                     <div class="flex items-center gap-2 mt-2">
@@ -1630,14 +1640,14 @@ watch(() => total.value, (newTotal) => {
           <div class="mt-6 relative">
             <input type="text"
                    v-model="customerSearchQuery"
-                   placeholder="Search by name, phone, or email..."
+                   placeholder="Search by name, email, or ID..."
                    class="w-full bg-gray-700/50 border border-gray-600/50 rounded-lg pl-12 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
             <Search class="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
           </div>
         </div>
         
         <!-- Customer List -->
-        <div class="p-6 max-h-[60vh] overflow-auto custom-scrollbar">
+        <div class="p-6 overflow-auto custom-scrollbar" :style="{ maxHeight: '340px' }">
           <div v-if="filteredCustomers.length === 0" 
                class="text-center py-8">
             <User class="w-12 h-12 mx-auto text-gray-500 mb-3" />
@@ -1649,7 +1659,7 @@ watch(() => total.value, (newTotal) => {
             <button v-for="customer in filteredCustomers"
                     :key="customer.id"
                     @click="selectCustomer(customer)"
-                    :class="[
+                    :class="[ 
                       'w-full text-left p-4 rounded-lg transition-all duration-200 border',
                       selectedCustomer?.id === customer.id
                         ? 'bg-blue-500/20 border-blue-500/50'
