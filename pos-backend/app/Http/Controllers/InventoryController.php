@@ -161,7 +161,6 @@ class InventoryController extends Controller
                         $item->supplier->email,
                         $item->product->name,
                         $inventory->quantity,
-                        $inventory->location,
                         $inventory->status
                     );
                     $supplierList->push($lowStockDetail);
@@ -226,40 +225,25 @@ class InventoryController extends Controller
                 $query->select(
                     'id',
                     'inventory_id',
-                    'supplier_id',
-                    'admin_id',
                     'name',
-                    'brand_name',
-                    'description',
-                    'bar_code',
-                    'size',
-                    'color',
+                    'model',
                     'price',
-                    'seller_price',
-                    'discount',
-                    'tax',
-                    'profit'
+                    'supplier_id'
                 );
             }])->get();
 
             $totalValue = 0;
-            $totalProfit = 0;
 
-            $formattedData = $inventories->map(function ($inventory) use (&$totalValue, &$totalProfit) {
+            $formattedData = $inventories->map(function ($inventory) use (&$totalValue) {
                 $status = $this->determineStatus($inventory->quantity);
 
                 $product = $inventory->product;
 
                 if ($product) {
-                    $itemValue = ($product->seller_price ?? 0) * $inventory->quantity;
-
-                    $itemProfit = (($product->price ?? 0) - ($product->seller_price ?? 0)) * $inventory->quantity;
-
+                    $itemValue = ($product->price ?? 0) * $inventory->quantity;
                     $totalValue += $itemValue;
-                    $totalProfit += $itemProfit;
                 } else {
                     $itemValue = 0;
-                    $itemProfit = 0;
                 }
 
                 return [
@@ -267,41 +251,29 @@ class InventoryController extends Controller
                     'product' => $product ? [
                         'id' => $product->id,
                         'name' => $product->name,
-                        'brand_name' => $product->brand_name,
-                        'description' => $product->description,
-                        'bar_code' => $product->bar_code,
-                        'size' => $product->size,
-                        'color' => $product->color,
+                        'model' => $product->model,
                         'price' => $product->price,
-                        'seller_price' => $product->seller_price,
-                        'discount' => $product->discount,
-                        'tax' => $product->tax,
-                        'profit' => $product->profit,
                         'supplier_id' => $product->supplier_id,
-                        'admin_id' => $product->admin_id,
+                        'inventory_id' => $product->inventory_id,
                     ] : null,
                     'quantity' => $inventory->quantity,
-                    'location' => $inventory->location,
                     'status' => $status,
                     'added_stock_amount' => $inventory->added_stock_amount,
                     'restock_date_time' => $inventory->restock_date_time,
                     'created_at' => $inventory->created_at,
                     'updated_at' => $inventory->updated_at,
-                    'total_value' => $itemValue,
-                    'total_profit' => $itemProfit
+                    'total_value' => $itemValue
                 ];
             });
 
             \Log::info('Export Data Summary', [
-                'total_value' => $totalValue,
-                'total_profit' => $totalProfit
+                'total_value' => $totalValue
             ]);
 
             return response()->json([
                 'data' => $formattedData,
                 'summary' => [
-                    'total_value' => $totalValue,
-                    'total_profit' => $totalProfit
+                    'total_value' => $totalValue
                 ]
             ]);
         } catch (Exception $e) {
@@ -320,9 +292,8 @@ class LowStockDetail
     public $supplier_email;
     public $product_name;
     public $quantity;
-    public $location;
     public $status;
-    public function __construct($supplier_id, $product_id, $supplier_name, $supplier_email, $product_name, $quantity, $location, $status)
+    public function __construct($supplier_id, $product_id, $supplier_name, $supplier_email, $product_name, $quantity, $status)
     {
         $this->supplier_id = $supplier_id;
         $this->product_id = $product_id;
@@ -330,7 +301,6 @@ class LowStockDetail
         $this->supplier_email = $supplier_email;
         $this->product_name = $product_name;
         $this->quantity = $quantity;
-        $this->location = $location;
         $this->status = $status;
     }
     

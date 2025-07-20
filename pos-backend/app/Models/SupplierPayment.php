@@ -14,9 +14,13 @@ class SupplierPayment extends Model
         'product_id',
         'inventory_id',
         'admin_id',
-        'amount',
+        'total_cost',
+        'amount_paid',
+        'remaining_balance',
+        'payment_status',
         'payment_method', // 'cash' or 'check'
         'check_number',   // nullable, only for check payments
+        'bank_name',
         'paid_at',
         'notes'
     ];

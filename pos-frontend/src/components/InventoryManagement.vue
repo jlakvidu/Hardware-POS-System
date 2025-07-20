@@ -32,6 +32,7 @@ import {
   UserIcon,
   BuildingStorefrontIcon,
   QrCodeIcon,
+  UserGroupIcon, // Add new icon import
 } from '@heroicons/vue/24/outline';
 import { Bar } from 'vue-chartjs';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
@@ -83,7 +84,6 @@ const stockAdjustment = ref({
   quantity: 0,
   restock_date_time: getSriLankaDateTime(),
   added_stock_amount: 0,
-  location: '',
   status: 'In Stock',
 });
 
@@ -104,8 +104,6 @@ const newProduct = ref({
   supplier_id: '',
 });
 
-const categories = ref(['All', 'Warehouse A', 'Warehouse B', 'Warehouse C']);
-const locations = ref(['Warehouse A', 'Warehouse B', 'Warehouse C']);
 const suppliers = ref([
   { id: 1, name: 'SafetyFirst Ltd' },
   { id: 2, name: 'PowerMax Tools' },
@@ -170,12 +168,12 @@ const chartOptions = {
   },
   scales: {
     y: { beginAtZero: true, grid: { color: 'rgba(75, 85, 99, 0.2)', drawBorder: false }, ticks: { color: '#9ca3af', font: { size: 11 }, callback: (value) => `${value.toLocaleString()} units` }, title: { display: true, text: 'Stock Quantity', color: '#9ca3af', font: { size: 12 } } },
-    x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 11 } }, title: { display: true, text: 'Location', color: '#9ca3af', font: { size: 12 } } },
+    x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 11 } }, title: { display: true, text: ' Items', color: '#9ca3af', font: { size: 12 } } },
   },
 };
 
 const filteredInventory = computed(() => {
-  // Only filter by id and status, since location is not present
+  // Remove location filtering
   let result = inventory.value;
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase();
@@ -207,7 +205,6 @@ const lowStockItems = computed(() => inventory.value.filter((item) => item.quant
 const outOfStockItems = computed(() => inventory.value.filter((item) => item.quantity === 0));
 const totalItems = computed(() => inventory.value.reduce((sum, item) => sum + item.quantity, 0));
 
-// Updated inventoryValue to use the same calculation logic as calculateStockValue
 const inventoryValue = computed(() => {
   return inventory.value.reduce((sum, item) => {
     if (!item?.product || !item?.quantity) return sum;
@@ -290,7 +287,7 @@ const fetchInventory = async () => {
         price: item.product.price,
         supplier_id: item.product.supplier_id,
         inventory_id: item.product.inventory_id,
-        image_url: item.product.image_url, // Add image
+        image_url: item.product.image_url,
         supplier: item.product.supplier ? {
           id: item.product.supplier.id,
           name: item.product.supplier.name,
@@ -318,7 +315,7 @@ const openAddModal = () => {
 };
 
 const saveNewItem = async () => {
-  if (!newItem.value.quantity /*|| !newItem.value.location*/) {
+  if (!newItem.value.quantity) {
     showNotification('Please fill in all required fields', 'error');
     return;
   }
@@ -328,14 +325,12 @@ const saveNewItem = async () => {
       quantity: parseInt(newItem.value.quantity) || 0,
       restock_date_time: newItem.value.restock_date_time || getSriLankaDateTime(),
       added_stock_amount: parseInt(newItem.value.added_stock_amount) || 0,
-      // location: newItem.value.location || '', // Removed
       status: newItem.value.status || 'In Stock',
     };
     const response = await connection.post('/inventory', payload);
     inventory.value.push(response.data);
     newlyAddedInventoryId.value = response.data.id;
 
-    await Swal.fire({ position: 'center', icon: 'success', title: 'Inventory Added Successfully!', text: 'Proceeding to add a new product.', showConfirmButton: false, timer: 1500, background: '#1e293b', color: '#ffffff' });
     currentStep.value = 2;
   } catch (error) {
     console.error('Error adding inventory:', error);
@@ -349,19 +344,23 @@ const showGRNDocument = ref(false);
 const grnProductData = ref(null);
 const grnNumber = ref('');
 
+const isSavingProduct = ref(false);
 const saveNewProduct = async () => {
+  isSavingProduct.value = true;
   try {
     if (!newProduct.value.name || !newProduct.value.model || !newProduct.value.price || !newProduct.value.supplier_id) {
       showNotification('Please fill in all required fields (Name, Model, Price, Supplier ID)', 'error');
+      isSavingProduct.value = false;
       return;
     }
     if (!newlyAddedInventoryId.value) {
       showNotification('Inventory ID is required', 'error');
+      isSavingProduct.value = false;
       return;
     }
     const payload = {
       name: newProduct.value.name.trim(),
-      model: newProduct.value.model.trim(), // Ensure model is sent
+      model: newProduct.value.model.trim(),
       price: parseFloat(newProduct.value.price) || 0,
       supplier_id: parseInt(newProduct.value.supplier_id),
       inventory_id: newlyAddedInventoryId.value,
@@ -378,7 +377,7 @@ const saveNewProduct = async () => {
 
     grnProductData.value = {
       name: newProduct.value.name,
-      model: newProduct.value.model, // Pass model to GRN report
+      model: newProduct.value.model,
       description: newProduct.value.description,
       quantity: newItem.value.quantity,
       price: parseFloat(newProduct.value.price),
@@ -415,9 +414,6 @@ const saveNewProduct = async () => {
       color: '#ffffff'
     });
 
-    // Show payment modal after product is added
-    showPaymentModal.value = true;
-
     showMultiStepModal.value = false;
     currentStep.value = 1;
     newProduct.value = {
@@ -426,7 +422,30 @@ const saveNewProduct = async () => {
       price: '',
       supplier_id: '',
     };
-    fetchInventory();
+    // Remove fetchInventory() here and update inventory/product locally below
+
+    // Fetch the new product with supplier and update the inventory array
+    try {
+      const inventoryRes = await connection.get(`/inventory/${newlyAddedInventoryId.value}`);
+      const productRes = await connection.get(`/products/inventory/${newlyAddedInventoryId.value}`);
+      const supplierRes = await connection.get(`/suppliers/${productRes.data.supplier_id}`);
+
+      // Find and update the inventory item in the array
+      const idx = inventory.value.findIndex(i => i.id === newlyAddedInventoryId.value);
+      if (idx !== -1) {
+        inventory.value[idx].product = {
+          ...productRes.data,
+          supplier: {
+            id: supplierRes.data.id,
+            name: supplierRes.data.name,
+            email: supplierRes.data.email,
+            contact: supplierRes.data.contact,
+          }
+        };
+      }
+    } catch (e) {
+      // If fails, just skip updating, UI will update on next fetch
+    }
   } catch (error) {
     let errorMessage = 'Failed to add product';
     if (error.response?.status === 422 && error.response.data?.message) {
@@ -450,6 +469,8 @@ const saveNewProduct = async () => {
       background: '#1e293b',
       color: '#ffffff'
     });
+  } finally {
+    isSavingProduct.value = false;
   }
 };
 
@@ -461,7 +482,7 @@ const closeGRNDocument = () => {
 
 const openStockModal = (item) => {
   selectedItem.value = item;
-  stockAdjustment.value = { quantity: 0, restock_date_time: getSriLankaDateTime(), added_stock_amount: 0, location: item.location, status: determineStatus(item.quantity) };
+  stockAdjustment.value = { quantity: 0, restock_date_time: getSriLankaDateTime(), added_stock_amount: 0, status: determineStatus(item.quantity) };
   showStockModal.value = true;
   nextTick(() => document.getElementById('stock-quantity')?.focus());
 };
@@ -625,59 +646,52 @@ const exportInventory = async () => {
     const response = await connection.get('/inventory/export-data');
     const inventoryData = response.data.data;
     const summary = response.data.summary;
+    // Calculate out of stock items for Excel export
+    const outOfStockCount = inventoryData.filter(item => item.quantity === 0).length;
     const workbook = XLSX.utils.book_new();
     const summaryWs = XLSX.utils.aoa_to_sheet([
-      ['HARDWARE POS SYSTEM - INVENTORY SUMMARY REPORT'],
+      ['Weads Horana Pvt Ltd - INVENTORY SUMMARY REPORT'],
       [`Report Generated: ${new Date().toLocaleString()}`],
       [''],
       ['EXECUTIVE SUMMARY'],
       ['Total Items:', totalItems.value],
       ['Total Value:', `Rs. ${inventoryValue.value.toLocaleString()}`],
       ['Total Profit:', `Rs. ${totalProfit.value.toLocaleString()}`],
-      ['Low Stock Items:', lowStockItems.value.length],
-      ['Categories:', categories.value.length - 1],
+      ['Out of Stock Items:', outOfStockCount],
       [''],
     ]);
     const inventoryHeaders = [
       ['INVENTORY DETAILS REPORT'],
       [''],
-      ['Inventory ID', 'Product ID', 'Name', 'Brand Name', 'Description', 'Bar Code', 'Size', 'Color', 'Quantity', 'Price (Rs.)', 'Seller Price (Rs.)', 'Discount (%)', 'Selling Discount (%)', 'Tax (%)', 'Profit (Rs.)', 'Total Value (Rs.)', 'Location', 'Status', 'Supplier ID', 'Admin ID', 'Added Stock', 'Last Restocked', 'Created Date', 'Updated Date'],
+      [
+        'Inventory ID',
+        'Product ID',
+        'Product Name',
+        'Model',
+        'Quantity',
+        'Price (Rs.)',
+        'Supplier ID',
+        'Added Stock',
+        'Status',
+        'Restock Date',
+        'Created Date',
+        'Updated Date'
+      ],
     ];
-    const inventoryRows = inventoryData.map((item) => {
-      const basePrice = parseFloat(item.product?.price || 0);
-      const supplierDiscount = parseFloat(item.product?.discount || 0);
-      const sellingDiscount = parseFloat(item.product?.selling_discount || 0);
-      const priceAfterSupplierDiscount = basePrice * (1 - supplierDiscount / 100);
-      const finalPrice = priceAfterSupplierDiscount * (1 - sellingDiscount / 100);
-      const totalValue = finalPrice * item.quantity;
-
-      return [
-        item.id,
-        item.product?.id || 'N/A',
-        item.product?.name || 'N/A',
-        item.product?.brand_name || 'N/A',
-        item.product?.description || 'N/A',
-        item.product?.bar_code || 'N/A',
-        item.product?.size || 'N/A',
-        item.product?.color || 'N/A',
-        item.quantity,
-        item.product?.price || 0,
-        item.product?.seller_price || 0,
-        item.product?.discount || 0,
-        item.product?.selling_discount || 0,
-        item.product?.tax || 0,
-        (finalPrice - (item.product?.seller_price || 0)),
-        totalValue,
-        item.location,
-        item.status,
-        item.product?.supplier_id || 'N/A',
-        item.product?.admin_id || 'N/A',
-        item.added_stock_amount || 0,
-        new Date(item.restock_date_time).toLocaleString(),
-        item.created_at ? new Date(item.created_at).toLocaleString() : 'N/A',
-        item.updated_at ? new Date(item.updated_at).toLocaleString() : 'N/A',
-      ];
-    });
+    const inventoryRows = inventoryData.map((item) => [
+      item.id,
+      item.product?.id || 'N/A',
+      item.product?.name || 'N/A',
+      item.product?.model || 'N/A',
+      item.quantity,
+      item.product?.price || 0,
+      item.product?.supplier_id || 'N/A',
+      item.added_stock_amount || 0,
+      item.status,
+      item.restock_date_time ? new Date(item.restock_date_time).toLocaleString() : 'N/A',
+      item.created_at ? new Date(item.created_at).toLocaleString() : 'N/A',
+      item.updated_at ? new Date(item.updated_at).toLocaleString() : 'N/A',
+    ]);
     const inventoryWs = XLSX.utils.aoa_to_sheet([...inventoryHeaders, ...inventoryRows]);
     XLSX.utils.book_append_sheet(workbook, summaryWs, 'Summary');
     XLSX.utils.book_append_sheet(workbook, inventoryWs, 'Inventory Details');
@@ -685,9 +699,9 @@ const exportInventory = async () => {
     const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const link = document.createElement('a');
     link.href = window.URL.createObjectURL(blob);
-    link.download = `Hardware_POS_Inventory_Report_${new Date().toISOString().split('T')[0]}.xlsx`;
+    link.download = `Excel_Inventory_Report_${new Date().toISOString().split('T')[0]}.xlsx`;
     link.click();
-    showNotification('Professional inventory report generated successfully', 'success');
+    showNotification('Inventory report generated successfully', 'success');
   } catch (error) {
     console.error('Error generating report:', error);
     showNotification('Failed to generate inventory report', 'error');
@@ -703,10 +717,12 @@ const exportToPDF = async () => {
     const response = await connection.get('/inventory');
     const inventoryData = response.data;
     const totalValue = inventoryValue.value;
+    // Calculate out of stock items
+    const outOfStockCount = inventoryData.filter(item => item.quantity === 0).length;
     const element = document.createElement('div');
     element.innerHTML = `
       <div style="padding: 20px; font-family: Arial, sans-serif;">
-        <h1 style="text-align: center; color: #1f2937;">HARDWARE POS SYSTEM</h1>
+        <h1 style="text-align: center; color: #1f2937;">Weads Horana Pvt Ltd</h1>
         <h2 style="text-align: center; color: #374151;">Inventory Management Report</h2>
         <p style="text-align: center; color: #4b5563;">Report Generated: ${new Date().toLocaleString()}</p>
         <div style="margin-top: 30px;">
@@ -715,37 +731,46 @@ const exportToPDF = async () => {
             <tr><th style="text-align: left; padding: 8px; border: 1px solid #d1d5db;">Metric</th><th style="text-align: right; padding: 8px; border: 1px solid #d1d5db;">Value</th></tr>
             <tr><td style="padding: 8px; border: 1px solid #d1d5db;">Total Inventory Items</td><td style="text-align: right; padding: 8px; border: 1px solid #d1d5db;">${totalItems.value}</td></tr>
             <tr><td style="padding: 8px; border: 1px solid #d1d5db;">Total Inventory Value</td><td style="text-align: right; padding: 8px; border: 1px solid #d1d5db;">Rs. ${totalValue.toLocaleString()}</td></tr>
-            <tr><td style="padding: 8px; border: 1px solid #d1d5db;">Low Stock Items</td><td style="text-align: right; padding: 8px; border: 1px solid #d1d5db;">${lowStockItems.value.length}</td></tr>
+            <tr><td style="padding: 8px; border: 1px solid #d1d5db;">Out of Stock Items</td><td style="text-align: right; padding: 8px; border: 1px solid #d1d5db;">${outOfStockCount}</td></tr>
           </table>
         </div>
         <div style="margin-top: 30px;">
           <h3 style="color: #1f2937;">DETAILED INVENTORY LIST</h3>
           <table style="width: 100%; margin-top: 10px; border-collapse: collapse;">
-            <tr><th style="text-align: left; padding: 8px; border: 1px solid #d1d5db;">ID</th><th style="text-align: left; padding: 8px; border: 1px solid #d1d5db;">Name</th><th style="text-align: left; padding: 8px; border: 1px solid #d1d5db;">Location</th><th style="text-align: right; padding: 8px; border: 1px solid #d1d5db;">Quantity</th><th style="text-align: right; padding: 8px; border: 1px solid #d1d5db;">Unit Price</th><th style="text-align: left; padding: 8px; border: 1px solid #d1d5db;">Status</th><th style="text-align: right; padding: 8px; border: 1px solid #d1d5db;">Total Value</th></tr>
-            ${inventoryData.map((item) => {
-              const basePrice = parseFloat(item.product?.price || 0);
-              const supplierDiscount = parseFloat(item.product?.discount || 0);
-              const sellingDiscount = parseFloat(item.product?.selling_discount || 0);
-              const priceAfterSupplierDiscount = basePrice * (1 - supplierDiscount / 100);
-              const finalPrice = priceAfterSupplierDiscount * (1 - sellingDiscount / 100);
-              const totalItemValue = finalPrice * item.quantity;
-              
-              return `
+            <tr>
+              <th style="text-align: left; padding: 8px; border: 1px solid #d1d5db;">Inventory ID</th>
+              <th style="text-align: left; padding: 8px; border: 1px solid #d1d5db;">Product ID</th>
+              <th style="text-align: left; padding: 8px; border: 1px solid #d1d5db;">Product Name</th>
+              <th style="text-align: left; padding: 8px; border: 1px solid #d1d5db;">Model</th>
+              <th style="text-align: right; padding: 8px; border: 1px solid #d1d5db;">Quantity</th>
+              <th style="text-align: right; padding: 8px; border: 1px solid #d1d5db;">Price (Rs.)</th>
+              <th style="text-align: left; padding: 8px; border: 1px solid #d1d5db;">Supplier ID</th>
+              <th style="text-align: right; padding: 8px; border: 1px solid #d1d5db;">Added Stock</th>
+              <th style="text-align: left; padding: 8px; border: 1px solid #d1d5db;">Status</th>
+              <th style="text-align: left; padding: 8px; border: 1px solid #d1d5db;">Restock Date</th>
+              <th style="text-align: left; padding: 8px; border: 1px solid #d1d5db;">Created Date</th>
+              <th style="text-align: left; padding: 8px; border: 1px solid #d1d5db;">Updated Date</th>
+            </tr>
+            ${inventoryData.map((item) => `
               <tr>
                 <td style="padding: 8px; border: 1px solid #d1d5db;">${item.id}</td>
+                <td style="padding: 8px; border: 1px solid #d1d5db;">${item.product?.id || 'N/A'}</td>
                 <td style="padding: 8px; border: 1px solid #d1d5db;">${item.product?.name || 'N/A'}</td>
-                <td style="padding: 8px; border: 1px solid #d1d5db;">${item.location}</td>
+                <td style="padding: 8px; border: 1px solid #d1d5db;">${item.product?.model || 'N/A'}</td>
                 <td style="text-align: right; padding: 8px; border: 1px solid #d1d5db;">${item.quantity}</td>
-                <td style="text-align: right; padding: 8px; border: 1px solid #d1d5db;">Rs. ${finalPrice.toLocaleString()}</td>
+                <td style="text-align: right; padding: 8px; border: 1px solid #d1d5db;">Rs. ${item.product?.price || 0}</td>
+                <td style="padding: 8px; border: 1px solid #d1d5db;">${item.product?.supplier_id || 'N/A'}</td>
+                <td style="text-align: right; padding: 8px; border: 1px solid #d1d5db;">${item.added_stock_amount || 0}</td>
                 <td style="padding: 8px; border: 1px solid #d1d5db;">${item.status}</td>
-                <td style="text-align: right; padding: 8px; border: 1px solid #d1d5db;">Rs. ${totalItemValue.toLocaleString()}</td>
+                <td style="padding: 8px; border: 1px solid #d1d5db;">${item.restock_date_time ? new Date(item.restock_date_time).toLocaleString() : 'N/A'}</td>
+                <td style="padding: 8px; border: 1px solid #d1d5db;">${item.created_at ? new Date(item.created_at).toLocaleString() : 'N/A'}</td>
+                <td style="padding: 8px; border: 1px solid #d1d5db;">${item.updated_at ? new Date(item.updated_at).toLocaleString() : 'N/A'}</td>
               </tr>
-            `}).join('')}
-            <tr><td colspan="6" style="text-align: right; padding: 8px; border: 1px solid #d1d5db; font-weight: bold;">Total:</td><td style="text-align: right; padding: 8px; border: 1px solid #d1d5db; font-weight: bold;">Rs. ${totalValue.toLocaleString()}</td></tr>
+            `).join('')}
           </table>
         </div>
         <div style="margin-top: 30px; text-align: center; color: #6b7280; font-size: 12px;">
-          <p>Generated by Hardware POS System</p>
+          <p>Generated by Weads Horana Pvt Ltd</p>
           <p>${new Date().toLocaleString()}</p>
         </div>
       </div>
@@ -771,11 +796,20 @@ const changePage = (page) => {
   currentPage.value = page;
 };
 
+const totalSuppliers = computed(() => {
+  // Count unique supplier IDs in inventory
+  const supplierIds = new Set();
+  inventory.value.forEach(item => {
+    if (item.product?.supplier_id) supplierIds.add(item.product.supplier_id);
+  });
+  return supplierIds.size;
+});
+
 const dashboardStats = computed(() => [
   { title: 'Total Items', value: totalItems.value, icon: ArchiveBoxIcon, color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' },
   { title: 'Total Value', value: `Rs. ${inventoryValue.value.toLocaleString()}`, icon: ArrowTrendingUpIcon, color: 'bg-violet-500/10 text-violet-500 border-violet-500/20' },
-  { title: 'Total Profit', value: `Rs. ${totalProfit.value.toLocaleString()}`, icon: ArrowTrendingUpIcon, color: 'bg-green-500/10 text-green-500 border-green-500/20' },
-  { title: 'Low Stock Items', value: lowStockItems.value.length, icon: ExclamationTriangleIcon, color: 'bg-amber-500/10 text-amber-500 border-amber-500/20' },
+  { title: 'Total Suppliers', value: totalSuppliers.value, icon: UserGroupIcon, color: 'bg-blue-500/10 text-blue-500 border-blue-500/20' },
+  { title: 'Out of Stock Items', value: outOfStockItems.value.length, icon: ExclamationTriangleIcon, color: 'bg-amber-500/10 text-amber-500 border-amber-500/20' },
 ]);
 
 const viewItemDetails = async (item) => {
@@ -930,45 +964,123 @@ const topProductsChartData = computed(() => {
 // Payment modal state and data
 const showPaymentModal = ref(false);
 const paymentDetails = ref({
-  amount: '',
+  total_cost: '',
+  amount_paid: '',
   payment_method: 'cash',
   check_number: '',
-  notes: ''
+  bank_name: '',
+  notes: '',
 });
 const isPayingSupplier = ref(false);
+const paymentStatus = ref('full');
+const remainingBalance = ref(null);
 
-// Show payment modal after product is added
-const openPaymentModal = (product, inventory) => {
-  paymentDetails.value = {
-    amount: product.price || '',
-    payment_method: 'cash',
-    check_number: '',
-    notes: ''
-  };
+// Track which item is being paid for
+const paymentItem = ref(null);
+
+// Store payment group and transactions for the selected item
+const paymentGroup = ref(null);
+const paymentTransactions = ref([]);
+const previousPaymentsTotal = ref(0);
+
+const openPaymentModal = async (item) => {
+  paymentItem.value = item;
+  paymentGroup.value = null;
+  paymentTransactions.value = [];
+  previousPaymentsTotal.value = 0;
+
+  try {
+    // Fetch payment group(s) for this supplier/product/inventory
+    const res = await connection.get('/supplier-payments', {
+      params: {
+        supplier_id: item.product?.supplier_id,
+        product_id: item.product?.id,
+        inventory_id: item.id,
+      }
+    });
+    // There should be only one group for this combination
+    const group = (res.data || [])[0];
+    if (group) {
+      paymentGroup.value = group;
+      paymentTransactions.value = group.transactions || [];
+      paymentStatus.value = group.payment_status;
+      remainingBalance.value = group.remaining_balance;
+      paymentDetails.value.total_cost = group.total_cost;
+      paymentDetails.value.amount_paid = group.remaining_balance > 0 ? group.remaining_balance : '';
+    } else {
+      // No group exists yet, so calculate total cost
+      const qty = Number(item.quantity) || 0;
+      const price = Number(item.product?.price) || 0;
+      const total = (qty * price).toFixed(2);
+      paymentDetails.value.total_cost = total;
+      paymentDetails.value.amount_paid = total;
+      paymentStatus.value = 'full';
+      remainingBalance.value = total;
+      paymentTransactions.value = [];
+      previousPaymentsTotal.value = 0;
+    }
+  } catch (e) {
+    paymentGroup.value = null;
+    paymentTransactions.value = [];
+    previousPaymentsTotal.value = 0;
+    paymentStatus.value = 'full';
+    remainingBalance.value = null;
+  }
+
+  paymentDetails.value.payment_method = 'cash';
+  paymentDetails.value.check_number = '';
+  paymentDetails.value.bank_name = '';
+  paymentDetails.value.notes = '';
   showPaymentModal.value = true;
 };
 
-// Handle payment submission
 const submitSupplierPayment = async () => {
-  if (!grnProductData.value || !grnProductData.value.supplier_id || !grnProductData.value.name) {
+  if (!paymentItem.value || !paymentItem.value.product?.supplier_id || !paymentItem.value.product?.id) {
     showNotification('Missing supplier or product info', 'error');
     return;
   }
   isPayingSupplier.value = true;
   try {
     const payload = {
-      supplier_id: grnProductData.value.supplier_id,
-      product_id: grnProductData.value.inventory_id ? null : grnProductData.value.id, // fallback
-      inventory_id: grnProductData.value.inventory_id,
-      admin_id: grnProductData.value.admin_id || 1, // Replace with actual admin id if available
-      amount: paymentDetails.value.amount,
+      supplier_id: paymentItem.value.product.supplier_id,
+      product_id: paymentItem.value.product.id,
+      inventory_id: paymentItem.value.id,
+      admin_id: 1, // Replace with actual admin id if available
+      total_cost: paymentDetails.value.total_cost,
+      amount_paid: paymentDetails.value.amount_paid,
       payment_method: paymentDetails.value.payment_method,
       check_number: paymentDetails.value.payment_method === 'check' ? paymentDetails.value.check_number : null,
-      notes: paymentDetails.value.notes
+      bank_name: paymentDetails.value.payment_method === 'check' ? paymentDetails.value.bank_name : null,
+      notes: paymentDetails.value.notes,
     };
-    await connection.post('/supplier-payments', payload);
-    showNotification('Supplier payment recorded successfully', 'success');
-    showPaymentModal.value = false;
+    const res = await connection.post('/supplier-payments', payload);
+    if (res.data && res.data.data) {
+      // Update modal state with new group and transaction info
+      paymentGroup.value = res.data.data.group;
+      paymentStatus.value = paymentGroup.value.payment_status;
+      remainingBalance.value = paymentGroup.value.remaining_balance;
+      // Fetch updated transactions
+      const groupRes = await connection.get('/supplier-payments', {
+        params: {
+          supplier_id: paymentItem.value.product?.supplier_id,
+          product_id: paymentItem.value.product?.id,
+          inventory_id: paymentItem.value.id,
+        }
+      });
+      const group = (groupRes.data || [])[0];
+      paymentTransactions.value = group?.transactions || [];
+      previousPaymentsTotal.value = paymentTransactions.value.reduce((sum, t) => sum + Number(t.amount_paid || 0), 0);
+
+      if (paymentStatus.value === 'advance' && remainingBalance.value > 0) {
+        showNotification(`Advance payment recorded. Remaining balance: Rs. ${Number(remainingBalance.value).toLocaleString()}`, 'success');
+      } else {
+        showNotification('Full payment completed!', 'success');
+      }
+      showPaymentModal.value = false;
+    } else {
+      showNotification('Supplier payment recorded successfully', 'success');
+      showPaymentModal.value = false;
+    }
   } catch (error) {
     showNotification('Failed to record supplier payment', 'error');
   } finally {
@@ -1017,13 +1129,9 @@ const submitSupplierPayment = async () => {
             <div class="flex flex-col w-full gap-3 md:flex-row md:w-auto">
               <div class="relative">
                 <MagnifyingGlassIcon class="h-4 text-gray-400 w-4 -translate-y-1/2 absolute left-3 top-1/2 transform" />
-                <input v-model="searchQuery" type="text" placeholder="Search by ID, location or status..."
+                <input v-model="searchQuery" type="text" placeholder="Search by ID or status..."
                   class="bg-gray-700/70 border border-gray-600/50 rounded-lg text-gray-200 text-sm w-full focus:outline-none focus:ring-2 focus:ring-emerald-500/50 md:w-64 pl-10 pr-4 py-2" />
               </div>
-              <select v-model="selectedCategory"
-                class="bg-gray-700/70 border border-gray-600/50 rounded-lg text-gray-200 text-sm appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500/50 px-4 py-2">
-                <option v-for="category in categories" :key="category" :value="category">{{ category }}</option>
-              </select>
               <button @click="showExportOptions = true"
                 class="flex bg-gray-700/70 rounded-lg text-gray-200 text-sm duration-200 gap-2 hover:bg-gray-600/70 items-center px-4 py-2 transition-colors"
                 :disabled="isExporting">
@@ -1049,6 +1157,7 @@ const submitSupplierPayment = async () => {
               <thead>
                 <tr class="text-gray-300 text-left text-sm">
                   <th class="text-left font-medium pb-4">ID</th>
+                  <th class="text-left font-medium pb-4">Product Name</th>
                   <th @click="toggleSort('quantity')" class="text-left cursor-pointer font-medium pb-4">
                     <div class="flex gap-1 items-center">Quantity
                       <component :is="getSortIcon('quantity')" v-if="getSortIcon('quantity')" class="h-4 w-4" />
@@ -1072,6 +1181,7 @@ const submitSupplierPayment = async () => {
                   class="border-gray-700/50 border-t duration-200 hover:bg-gray-700/30 transition-colors"
                   :class="{ 'bg-red-900/20': item.status === 'Low Stock' || item.status === 'Out Of Stock' }">
                   <td class="font-medium py-4">{{ item.id }}</td>
+                  <td>{{ item.product?.name || 'N/A' }}</td>
                   <td>{{ item.quantity }}</td>
                   <td>
                     <span :class="{ 'px-2 py-1 rounded-full text-xs': true, 'bg-emerald-500/20 text-emerald-400': item.status === 'In Stock', 'bg-yellow-500/20 text-yellow-400': item.status === 'Low Stock', 'bg-red-500/20 text-red-400': item.status === 'Out Of Stock' }">
@@ -1101,6 +1211,16 @@ const submitSupplierPayment = async () => {
                         title="Return Product">
                         <ArrowLeftIcon class="h-4 w-4" />
                       </button>
+                      <button
+                        @click="openPaymentModal(item)"
+                        class="bg-indigo-500/20 p-1.5 rounded text-indigo-400 duration-200 hover:bg-indigo-500/30 transition-colors"
+                        title="Pay Supplier"
+                      >
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                          <path d="M12 8v8m0 0l-3-3m3 3l3-3" stroke-linecap="round" stroke-linejoin="round"/>
+                          <rect x="3" y="5" width="18" height="14" rx="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -1126,7 +1246,7 @@ const submitSupplierPayment = async () => {
           <div v-if="filteredInventory.length === 0" class="text-center text-gray-400 py-8">
             <ArchiveBoxIcon class="h-12 w-12 mb-4 mx-auto opacity-50" />
             <p>No inventory items found matching your criteria</p>
-            <button @click="searchQuery = ''; selectedCategory = 'All'"
+            <button @click="searchQuery = ''"
               class="flex text-emerald-400 gap-2 hover:text-emerald-300 items-center mt-4 mx-auto">
               <ArrowPathIcon class="h-4 w-4" /><span>Reset filters</span>
             </button>
@@ -1158,17 +1278,27 @@ const submitSupplierPayment = async () => {
                 :class="{ 'animate-fade-in': index < 3 }">
                 <div>
                   <div class="text-white font-bold">
-                    Product name: {{ item.product?.name || 'Unknown' }}
+                    Product name: {{ item.product?.name || 'N/A' }}
+                  </div>
+                  <!-- Only show fields that exist in your DB -->
+                  <div class="text-gray-400 text-sm">
+                    Product ID: {{ item.product?.id || 'N/A' }}
                   </div>
                   <div class="text-gray-400 text-sm">
-                    Brand name: {{ item.product?.brand_name || 'Unknown' }}
+                    Status: {{ item.status || 'N/A' }}
+                  </div>
+                  <!-- Remove or comment out fields not in DB -->
+                  <!--
+                  <div class="text-gray-400 text-sm">
+                    Brand name: {{ item.product?.brand_name || 'N/A' }}
                   </div>
                   <div class="text-gray-400 text-sm">
-                    Size: {{ item.product?.size || 'Unknown' }}
+                    Size: {{ item.product?.size || 'N/A' }}
                   </div>
                   <div class="text-gray-400 text-sm">
-                    Location: {{ item.location }}
+                    Location: {{ item.location || 'N/A' }}
                   </div>
+                  -->
                 </div>
                 <div class="text-right">
                   <div class="text-red-400 font-bold">{{ item.quantity }}</div>
@@ -1178,23 +1308,6 @@ const submitSupplierPayment = async () => {
             </div>
             <div v-else class="text-center text-gray-400 py-6">
               <p>No out of stock items! 🎉</p>
-            </div>
-          </div>
-          <div class="bg-gray-800/80 border border-gray-700/50 p-6 rounded-xl shadow-xl overflow-hidden">
-            <div class="bg-gradient-to-br from-green-500/10 to-green-600/10 border border-green-500/20 p-4 rounded-xl">
-              <div class="flex justify-between items-center">
-                <div class="flex gap-3 items-center">
-                  <div class="bg-green-500/20 p-2 rounded-lg">
-                    <ArrowTrendingUpIcon class="h-5 text-green-400 w-5" />
-                  </div>
-                </div>
-                <div class="text-right">
-                  <span class="text-gray-400 text-sm">Profit Margin</span>
-                  <p class="text-green-400 font-bold mt-0.5">
-                    {{ inventoryValue.value > 0 ? ((totalProfit.value / inventoryValue.value) * 100).toFixed(1) : 0 }}%
-                  </p>
-                </div>
-              </div>
             </div>
           </div>
           <div class="bg-gray-800/80 border border-gray-700/50 p-6 rounded-xl shadow-xl overflow-hidden">
@@ -1256,10 +1369,6 @@ const submitSupplierPayment = async () => {
                 <span class="text-gray-400 text-sm">Current Stock</span>
                 <div class="text-3xl text-white font-bold mt-1">{{ selectedItem.quantity }}</div>
               </div>
-              <div class="text-right">
-                <span class="text-gray-400 text-sm">Location</span>
-                <div class="text-lg text-white font-medium mt-1">{{ selectedItem.location }}</div>
-              </div>
             </div>
           </div>
           <div class="space-y-5">
@@ -1280,7 +1389,7 @@ const submitSupplierPayment = async () => {
                     <path fill-rule="evenodd"
                       d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
                       clip-rule="evenodd" />
-                  </svg>
+                </svg>
                 </button>
               </div>
             </div>
@@ -1360,42 +1469,29 @@ const submitSupplierPayment = async () => {
               <p class="text-gray-400 text-sm">Choose your preferred format</p>
             </div>
           </div>
-          <button @click="showExportOptions = false" class="p-2 rounded-lg hover:bg-gray-700/50 transition-colors">
-            <XMarkIcon class="h-5 text-gray-400 w-5" />
-          </button>
-        </div>
-
-        <!-- Format Options -->
-        <div class="grid grid-cols-2 gap-4 mb-6">
           <button @click="exportInventory"
-            class="bg-gradient-to-br border border-blue-500/20 p-4 rounded-xl duration-200 from-blue-600/10 group hover:from-blue-600/20 hover:to-blue-700/20 relative to-blue-700/10 transition-all">
+            class="bg-gradient-to-br border border-indigo-500/20 p-4 rounded-xl duration-200 from-indigo-600/10 group hover:from-indigo-600/20 hover:to-indigo-700/20 relative to-indigo-700/10 transition-all">
             <div class="flex flex-col gap-3 items-center">
-              <div class="bg-blue-500/10 border border-blue-500/20 p-3 rounded-lg">
-                <svg class="h-8 text-blue-400 w-8" viewBox="0 0 24 24" fill="none">
-                  <path d="M20 7L12 3L4 7M20 7L12 11M20 7V17L12 21M12 11L4 7M12 11V21M4 7V17L12 21"
-                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
+              <div class="bg-indigo-500/10 border border-indigo-500/20 p-3 rounded-lg">
+                <ArrowDownTrayIcon class="h-8 text-indigo-400 w-8" />
               </div>
               <div class="text-center">
                 <h4 class="text-white font-semibold mb-1">Excel Format</h4>
-                <p class="text-gray-400 text-sm">Detailed spreadsheet</p>
+                <p class="text-gray-400 text-sm">Spreadsheet report</p>
               </div>
             </div>
             <div
-              class="border border-blue-500/0 rounded-xl absolute duration-200 group-hover:border-blue-500/50 inset-0 transition-all">
+              class="border border-indigo-500/0 rounded-xl absolute duration-200 group-hover:border-indigo-500/50 inset-0 transition-all">
             </div>
           </button>
 
           <button @click="exportToPDF"
-            class="bg-gradient-to-br border border-red-500/20 p-4 rounded-xl duration-200 from-red-600/10 group hover:from-red-600/20 hover:to-red-700/20 relative to-red-700/10 transition-all">
+            class="bg-gradient-tobr border border-red-500/20 p-4 rounded-xl duration-200 from-red-600/10 group hover:from-red-600/20 hover:to-red-700/20 relative to-red-700/10 transition-all">
             <div class="flex flex-col gap-3 items-center">
               <div class="bg-red-500/10 border border-red-500/20 p-3 rounded-lg">
                 <svg class="h-8 text-red-400 w-8" viewBox="0 0 24 24" fill="none">
                   <path d="M7 18H17V16H7V18Z" fill="currentColor" />
-                  <path d="M17 14H7V12H17V14Z" fill="currentColor" />
-                  <path d="M7 10H11V8H7V10Z" fill="currentColor" />
-                  <path fill-rule="evenodd" clip-rule="evenodd"
-                    d="M6 2C4.34315 2 3 3.34315 3 5V19C3 20.6569 4.34315 22 6 22H18C19.6569 22 21 20.6569 21 19V9C21 5.13401 17.866 2 14 2H6ZM6 4H13V9H19V19C19 19.5523 18.5523 20 18 20H6C5.44772 20 5 19.5523 5 19V5C5 4.44772 5.44772 4 6 4ZM15 4.10002C16.6113 4.4271 17.9413 5.52906 18.584 7H15V4.10002Z"
+                  <path d
                     fill="currentColor" />
                 </svg>
               </div>
@@ -1479,7 +1575,7 @@ const submitSupplierPayment = async () => {
 
         <div v-if="selectedItem" class="space-y-6">
           <!-- Main Info Card -->
-          <div class="bg-gradient-to-br border border-gray-700/50 p-5 rounded-xl from-gray-800/50 to-gray-800/30">
+          <div class="bg-gradient-to-br border border-gray-700/50 p-4 rounded-xl from-gray-800/50 to-gray-800/30">
             <div class="flex justify-between items-center mb-4">
               <div class="flex gap-3 items-center">
                 <div class="bg-gray-700/50 p-2 rounded-lg">
@@ -1508,10 +1604,6 @@ const submitSupplierPayment = async () => {
               <div>
                 <span class="text-gray-400 text-sm">Current Stock</span>
                 <div class="text-3xl text-white font-bold mt-1">{{ selectedItem.quantity }}</div>
-              </div>
-              <div class="text-right">
-                <span class="text-gray-400 text-sm">Location</span>
-                <div class="text-lg text-white font-medium mt-1">{{ selectedItem.location }}</div>
               </div>
             </div>
             <!-- Supplier Info -->
@@ -1567,16 +1659,6 @@ const submitSupplierPayment = async () => {
 
           <!-- Additional Details -->
           <div class="grid grid-cols-2 gap-4">
-            <div class="space-y-4">
-              <div class="bg-gray-800/50 border border-gray-700/50 p-4 rounded-xl">
-                <span class="text-gray-400 text-sm">Location</span>
-                <div class="flex gap-2 items-center mt-1">
-                  <FunnelIcon class="h-5 text-gray-400 w-5" />
-                  <p class="text-lg text-white font-medium">{{ selectedItem.location }}</p>
-                </div>
-              </div>
-            </div>
-
             <div class="space-y-4">
               <div class="bg-gray-800/50 border border-gray-700/50 p-4 rounded-xl">
                 <span class="text-gray-400 text-sm">Last Updated</span>
@@ -1658,7 +1740,6 @@ const submitSupplierPayment = async () => {
                       <FormLabel>Added Stock Amount</FormLabel>
                       <input v-model="newItem.added_stock_amount" type="number" class="form-input" />
                     </FormField>
-                    <!-- Location field removed -->
                   </div>
                   <div class="flex justify-end space-x-3 mt-6">
                     <button @click="showMultiStepModal = false" class="btn-secondary">Cancel</button>
@@ -1689,7 +1770,20 @@ const submitSupplierPayment = async () => {
                   </div>
                   <div class="flex justify-end space-x-3 mt-6">
                     <button @click="currentStep = 1" class="btn-secondary">Back</button>
-                    <button @click="saveNewProduct" class="btn-primary">Save Product</button>
+                    <button @click="saveNewProduct" :disabled="isSavingProduct" class="btn-primary">
+                      <template v-if="isSavingProduct">
+        <svg class="h-5 w-5 animate-spin mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+          </path>
+        </svg>
+        Saving...
+      </template>
+      <template v-else>
+        Save Product
+      </template>
+    </button>
                   </div>
                 </div>
               </DialogPanel>
@@ -1756,16 +1850,50 @@ const submitSupplierPayment = async () => {
         <div class="flex justify-between items-center mb-6">
           <div>
             <h2 class="text-2xl text-white font-bold mb-1">Supplier Payment</h2>
-            <p class="text-gray-400 text-sm">Pay supplier for the new product</p>
+            <p class="text-gray-400 text-sm">Pay supplier for the selected product</p>
           </div>
           <button @click="showPaymentModal = false" class="p-2 rounded-lg hover:bg-gray-700/50 transition-colors">
             <XMarkIcon class="h-5 text-gray-400 w-5" />
           </button>
         </div>
+        <!-- Payment History Section -->
+        <div v-if="paymentTransactions.length > 0" class="mb-4">
+          <div class="bg-gray-800/70 border border-gray-700/50 rounded-lg p-3">
+            <h3 class="text-gray-300 text-sm font-semibold mb-2">Payment History</h3>
+            <table class="w-full text-xs text-gray-300">
+              <thead>
+                <tr>
+                  <th class="text-left py-1">Date</th>
+                  <th class="text-left py-1">Method</th>
+                  <th class="text-right py-1">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="t in paymentTransactions" :key="t.id">
+                  <td>{{ new Date(t.paid_at).toLocaleString() }}</td>
+                  <td>{{ t.payment_method }}</td>
+                  <td class="text-right">Rs. {{ Number(t.amount_paid).toLocaleString() }}</td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="2" class="text-right font-semibold">Total Paid:</td>
+                  <td class="text-right font-semibold">Rs. {{ Number(previousPaymentsTotal).toLocaleString() }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
         <form @submit.prevent="submitSupplierPayment" class="space-y-4">
           <div>
-            <label class="form-label">Amount</label>
-            <input v-model="paymentDetails.amount" type="number" min="0" class="form-input" required />
+            <label class="form-label">Total Cost</label>
+            <input v-model="paymentDetails.total_cost" type="number" min="0" class="form-input" readonly />
+          </div>
+          <div>
+            <label class="form-label">Amount Paid</label>
+            <input v-model="paymentDetails.amount_paid" type="number" min="0" class="form-input" required :readonly="remainingBalance === 0" />
+            <span v-if="remainingBalance > 0" class="text-xs text-gray-400">Remaining balance: Rs. {{ Number(remainingBalance).toLocaleString() }}</span>
+            <span v-else class="text-xs text-green-400">Full payment completed</span>
           </div>
           <div>
             <label class="form-label">Payment Method</label>
@@ -1777,15 +1905,28 @@ const submitSupplierPayment = async () => {
           <div v-if="paymentDetails.payment_method === 'check'">
             <label class="form-label">Check Number</label>
             <input v-model="paymentDetails.check_number" type="text" class="form-input" required />
+            <label class="form-label">Bank Name</label>
+            <input v-model="paymentDetails.bank_name" type="text" class="form-input" required />
           </div>
           <div>
             <label class="form-label">Notes</label>
             <input v-model="paymentDetails.notes" type="text" class="form-input" placeholder="Optional" />
           </div>
+          <div v-if="remainingBalance !== null">
+            <div class="text-yellow-400 font-semibold" v-if="remainingBalance > 0">
+              Remaining Balance: Rs. {{ Number(remainingBalance).toLocaleString() }}
+            </div>
+            <div class="text-green-400 font-semibold" v-else>
+              No remaining balance. Payment complete.
+            </div>
+            <div class="text-gray-400 text-sm">
+              Payment Status: <span :class="paymentStatus === 'full' ? 'text-green-400' : 'text-yellow-400'">{{ paymentStatus }}</span>
+            </div>
+          </div>
           <div class="flex justify-end gap-3 mt-6">
             <button @click="showPaymentModal = false" type="button" class="btn-secondary">Cancel</button>
-            <button type="submit" :disabled="isPayingSupplier" class="btn-primary">
-              {{ isPayingSupplier ? 'Processing...' : 'Pay Supplier' }}
+            <button type="submit" :disabled="isPayingSupplier || remainingBalance === 0" class="btn-primary">
+              {{ isPayingSupplier ? 'Processing...' : (remainingBalance > 0 ? 'Pay Supplier' : 'Paid') }}
             </button>
           </div>
         </form>

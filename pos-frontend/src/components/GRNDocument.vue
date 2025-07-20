@@ -348,10 +348,10 @@ const totalAmount = computed(() => subtotalAmount.value);
             <div class="h-8 w-8 bg-blue-600 rounded-full flex items-center justify-center text-white mr-2">
               <TruckIcon class="w-5 h-5" />
             </div>
-            <p class="text-sm font-semibold text-gray-700">HARDWARE ENTERPRISE</p>
+            <p class="text-sm font-semibold text-gray-700">Weads Horana Pvt Ltd</p>
           </div>
           <p class="text-xs text-gray-500">This is an official receipt of goods. Please retain for your records.</p>
-          <p class="text-xs text-gray-500 mt-1">© {{ new Date().getFullYear() }} Hardware Enterprise Inc. All rights reserved.</p>
+          <p class="text-xs text-gray-500 mt-1">© {{ new Date().getFullYear() }} Weads Horana Pvt Ltd Inc. All rights reserved.</p>
           <div class="flex justify-center mt-2 space-x-1">
             <div class="h-1 w-1 rounded-full bg-gray-300"></div>
             <div class="h-1 w-1 rounded-full bg-gray-300"></div>

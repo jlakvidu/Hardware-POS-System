@@ -48,6 +48,7 @@ const assets = ref([])
 const investments = ref([])
 const loans = ref([])
 const dailyExpenses = ref([])
+const supplierPayments = ref([])
 
 // Form data
 const formData = ref({
@@ -164,6 +165,9 @@ const filteredItems = computed(() => {
     case 'dailyExpenses':
       items = dailyExpenses.value
       break
+    case 'supplierPayments':
+      items = supplierPayments.value
+      break
   }
   
   if (!searchQuery.value) return items
@@ -184,6 +188,10 @@ const filteredItems = computed(() => {
       return item.category.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
              item.custom_category?.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
              item.description?.toLowerCase().includes(searchQuery.value.toLowerCase())
+    } else if (activeTab.value === 'supplierPayments') {
+      return item.supplier?.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+             item.product?.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+             item.payment_status.toLowerCase().includes(searchQuery.value.toLowerCase())
     }
     return false
   })
@@ -217,6 +225,8 @@ const totalValue = computed(() => {
     return loans.value.reduce((sum, loan) => sum + parseFloat(loan.amount || 0), 0)
   } else if (activeTab.value === 'dailyExpenses') {
     return dailyExpenses.value.reduce((sum, expense) => sum + parseFloat(expense.amount || 0), 0)
+  } else if (activeTab.value === 'supplierPayments') {
+    return supplierPayments.value.reduce((sum, group) => sum + parseFloat(group.total_cost || 0), 0)
   }
   return 0
 })
@@ -224,6 +234,7 @@ const totalValue = computed(() => {
 const formTitle = computed(() => {
   const action = formMode.value === 'add' ? 'Add' : 'Edit'
   const type = activeTab.value.charAt(0).toUpperCase() + activeTab.value.slice(1, -1)
+  if (activeTab.value === 'supplierPayments') return 'Supplier Payment'
   return `${action} ${type}`
 })
 
@@ -303,6 +314,8 @@ const isFormValid = computed(() => {
       return isValidLoanForm.value
     case 'dailyExpenses':
       return isValidDailyExpensesForm.value
+    case 'supplierPayments':
+      return false // No form for supplier payments
     default:
       return false
   }
@@ -314,18 +327,27 @@ const isSubmitting = ref(false)
 const fetchData = async () => {
   isLoading.value = true
   try {
+    // Fetch main data first (without supplier payments)
     const [assetsRes, investmentsRes, loansRes, expensesRes] = await Promise.all([
       connection.get('/assets'),
       connection.get('/investments'),
       connection.get('/loans'),
       connection.get('/api/daily-expenses')
     ])
-    
     assets.value = assetsRes.data
     investments.value = investmentsRes.data
     loans.value = updateOverdueLoans(loansRes.data)
     dailyExpenses.value = expensesRes.data
-    
+
+    // Fetch supplier payments in parallel, but don't block UI
+    connection.get('/supplier-payments?fields=id,supplier_id,product_id,total_cost,remaining_balance,payment_status')
+      .then(res => {
+        supplierPayments.value = res.data
+      })
+      .catch(() => {
+        supplierPayments.value = []
+      })
+
     const overdueUpdates = loans.value
       .filter(loan => loan.status === 'overdue' && loansRes.data.find(l => l.id === loan.id)?.status === 'pending')
       .map(loan => connection.put(`/loans/${loan.id}`, { ...loan }))
@@ -544,6 +566,9 @@ const deleteItem = async (item) => {
       } else if (activeTab.value === 'dailyExpenses') {
         await connection.delete(`/api/daily-expenses/${item.id}`);
         dailyExpenses.value = dailyExpenses.value.filter(expense => expense.id !== item.id);
+      } else if (activeTab.value === 'supplierPayments') {
+        await connection.delete(`/supplier-payments/${item.id}`);
+        supplierPayments.value = supplierPayments.value.filter(payment => payment.id !== item.id);
       }
 
       Swal.fire({
@@ -556,10 +581,48 @@ const deleteItem = async (item) => {
       });
     }
   } catch (error) {
-    console.error('Error deleting item:', error);
     Swal.fire({
       title: 'Error',
       text: 'Failed to delete the item. Please try again.',
+      icon: 'error',
+      confirmButtonColor: '#3B82F6',
+      background: '#1e293b',
+      color: '#ffffff'
+    });
+  }
+};
+
+const deleteSupplierPayment = async (item) => {
+  try {
+    const result = await Swal.fire({
+      title: `Delete Supplier Payment?`,
+      text: `Are you sure you want to delete this supplier payment? This action cannot be undone.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#EF4444',
+      cancelButtonColor: '#6B7280',
+      confirmButtonText: 'Yes, delete it',
+      background: '#1e293b',
+      color: '#ffffff'
+    });
+
+    if (result.isConfirmed) {
+      await connection.delete(`/supplier-payments/${item.id}`)
+      // Remove from UI immediately
+      supplierPayments.value = supplierPayments.value.filter(payment => payment.id !== item.id)
+      Swal.fire({
+        title: 'Deleted!',
+        text: `Supplier payment has been deleted.`,
+        icon: 'success',
+        confirmButtonColor: '#3B82F6',
+        background: '#1e293b',
+        color: '#ffffff'
+      });
+    }
+  } catch (error) {
+    Swal.fire({
+      title: 'Error',
+      text: 'Failed to delete the supplier payment. Please try again.',
       icon: 'error',
       confirmButtonColor: '#3B82F6',
       background: '#1e293b',
@@ -578,6 +641,8 @@ const getActiveItems = () => {
       return loans.value
     case 'dailyExpenses':
       return dailyExpenses.value
+    case 'supplierPayments':
+      return supplierPayments.value
     default:
       return []
   }
@@ -634,6 +699,14 @@ const isSidebarVisible = ref(false)
 const toggleSidebar = () => { isSidebarVisible.value = !isSidebarVisible.value }
 const closeSidebar = () => { isSidebarVisible.value = false }
 const showSidebar = () => { isSidebarVisible.value = true }
+
+// Remove Supplier Payment Edit Modal state and methods
+// const showSupplierPaymentEditModal = ref(false)
+// const supplierPaymentEditData = ref({...})
+// const isSupplierPaymentSubmitting = ref(false)
+// const openSupplierPaymentEdit = (item) => {...}
+// const closeSupplierPaymentEdit = () => {...}
+// const handleSupplierPaymentUpdate = async () => {...}
 </script>
 
 <template>
@@ -661,7 +734,7 @@ const showSidebar = () => { isSidebarVisible.value = true }
               <div class="text-xs text-slate-400 mb-0.5">Total Value</div>
               <div class="text-lg font-bold text-white">{{ formatCurrency(totalValue) }}</div>
             </div>
-            <button @click="openAddForm" 
+            <button v-if="activeTab !== 'supplierPayments'" @click="openAddForm" 
                     class="p-2.5 rounded-full bg-indigo-600 text-white hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20">
               <PlusIcon class="w-5 h-5" />
             </button>
@@ -692,6 +765,12 @@ const showSidebar = () => { isSidebarVisible.value = true }
                   :class="activeTab === 'dailyExpenses' ? 'bg-indigo-500/20 text-indigo-300 shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-700/30'">
             <ArrowsRightLeftIcon class="w-5 h-5 mr-2" />
             <span class="font-medium">Daily Expenses</span>
+          </button>
+          <button @click="setActiveTab('supplierPayments')" 
+                  class="px-4 py-2.5 rounded-lg flex items-center transition-all duration-200"
+                  :class="activeTab === 'supplierPayments' ? 'bg-indigo-500/20 text-indigo-300 shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-700/30'">
+            <BanknotesIcon class="w-5 h-5 mr-2" />
+            <span class="font-medium">Supplier Payments</span>
           </button>
         </div>
 
@@ -724,13 +803,14 @@ const showSidebar = () => { isSidebarVisible.value = true }
             <p class="text-slate-500 max-w-md mb-8">
               {{ searchQuery ? 'Try adjusting your search query' : `You don't have any ${activeTab} yet` }}
             </p>
-            <button @click="openAddForm" 
-                    class="px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-medium hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20 flex items-center">
+            <button 
+              v-if="activeTab !== 'supplierPayments'" 
+              @click="openAddForm" 
+              class="px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-medium hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20 flex items-center">
               <PlusIcon class="w-5 h-5 mr-2" />
               <span>Add {{ activeTab.slice(0, -1) }}</span>
             </button>
           </div>
-
           <div v-else-if="activeTab === 'assets'" class="w-full">
             <table class="w-full border-collapse">
               <thead>
@@ -983,6 +1063,48 @@ const showSidebar = () => { isSidebarVisible.value = true }
                         <PencilIcon class="w-5 h-5" />
                       </button>
                       <button @click="deleteItem(item)" class="text-rose-400 hover:text-rose-300 p-1.5 hover:bg-slate-700/50 rounded-lg transition-colors">
+                        <TrashIcon class="w-5 h-5" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div v-else-if="activeTab === 'supplierPayments'" class="w-full">
+            <table class="w-full border-collapse">
+              <thead>
+                <tr class="text-left border-b border-slate-700/50 bg-slate-800/30">
+                  <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Supplier</th>
+                  <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Product</th>
+                  <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Total Cost</th>
+                  <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Remaining</th>
+                  <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Status</th>
+                  <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="item in sortedItems" :key="item.id" class="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors">
+                  <td class="px-6 py-4 text-white font-medium">{{ item.supplier?.name || '-' }}</td>
+                  <td class="px-6 py-4 text-slate-300">{{ item.product?.name || '-' }}</td>
+                  <td class="px-6 py-4 text-slate-300 font-medium">{{ formatCurrency(item.total_cost) }}</td>
+                  <td class="px-6 py-4 text-slate-300 font-medium">{{ formatCurrency(item.remaining_balance) }}</td>
+                  <td class="px-6 py-4">
+                    <span class="px-3 py-1.5 rounded-full text-xs font-medium inline-block"
+                          :class="{
+                            'bg-amber-500/20 text-amber-400 border border-amber-500/20': item.payment_status === 'advance',
+                            'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20': item.payment_status === 'full'
+                          }">
+                      {{ item.payment_status.charAt(0).toUpperCase() + item.payment_status.slice(1) }}
+                    </span>
+                  </td>
+                  <td class="px-6 py-4">
+                    <div class="flex justify-end space-x-2">
+                      <button @click="viewDetails(item)" class="text-cyan-400 hover:text-cyan-300 p-1.5 hover:bg-slate-700/50 rounded-lg transition-colors">
+                        <EyeIcon class="w-5 h-5" />
+                      </button>
+                      <button @click="deleteSupplierPayment(item)" class="text-rose-400 hover:text-rose-300 p-1.5 hover:bg-slate-700/50 rounded-lg transition-colors">
                         <TrashIcon class="w-5 h-5" />
                       </button>
                     </div>
@@ -1306,6 +1428,62 @@ const showSidebar = () => { isSidebarVisible.value = true }
                   <div>
                     <span class="text-sm font-medium text-cyan-400">Date</span>
                     <p class="text-white mt-1.5">{{ formatDate(viewingItem.date) }}</p>
+                  </div>
+                </div>
+              </template>
+
+              <template v-if="activeTab === 'supplierPayments'">
+                <div class="bg-slate-800/50 backdrop-blur-sm p-5 rounded-xl border border-slate-700/30 space-y-4">
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Supplier</span>
+                    <p class="text-white mt-1.5 font-medium">{{ viewingItem.supplier?.name || '-' }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Product</span>
+                    <p class="text-white mt-1.5">{{ viewingItem.product?.name || '-' }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Total Cost</span>
+                    <p class="text-white mt-1.5 font-medium">{{ formatCurrency(viewingItem.total_cost) }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Remaining Balance</span>
+                    <p class="text-white mt-1.5 font-medium">{{ formatCurrency(viewingItem.remaining_balance) }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Status</span>
+                    <p class="mt-1.5">
+                      <span class="px-3 py-1.5 rounded-full text-xs font-medium inline-block"
+                            :class="{
+                              'bg-amber-500/20 text-amber-400 border border-amber-500/20': viewingItem.payment_status === 'advance',
+                              'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20': viewingItem.payment_status === 'full'
+                            }">
+                        {{ viewingItem.payment_status.charAt(0).toUpperCase() + viewingItem.payment_status.slice(1) }}
+                      </span>
+                    </p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Transactions</span>
+                    <table class="w-full mt-2 text-sm">
+                      <thead>
+                        <tr>
+                          <th class="text-left text-slate-400 font-semibold py-1">Amount Paid</th>
+                          <th class="text-left text-slate-400 font-semibold py-1">Method</th>
+                          <th class="text-left text-slate-400 font-semibold py-1">Check #</th>
+                          <th class="text-left text-slate-400 font-semibold py-1">Bank</th>
+                          <th class="text-left text-slate-400 font-semibold py-1">Paid At</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="tx in viewingItem.transactions" :key="tx.id">
+                          <td class="py-1 text-white">{{ formatCurrency(tx.amount_paid) }}</td>
+                          <td class="py-1 text-white">{{ tx.payment_method }}</td>
+                          <td class="py-1 text-white">{{ tx.check_number || '-' }}</td>
+                          <td class="py-1 text-white">{{ tx.bank_name || '-' }}</td>
+                          <td class="py-1 text-white">{{ formatDate(tx.paid_at) }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </template>
