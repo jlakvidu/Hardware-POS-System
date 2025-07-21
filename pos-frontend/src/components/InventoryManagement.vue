@@ -1088,6 +1088,27 @@ const submitSupplierPayment = async () => {
   }
 };
 
+// Step 1 input refs
+const quantityRef = ref(null);
+const restockDateRef = ref(null);
+const addedStockRef = ref(null);
+// Step 2 input refs
+const productNameRef = ref(null);
+const modelRef = ref(null);
+const priceRef = ref(null);
+const supplierIdRef = ref(null);
+
+// Arrays for easier navigation
+const step1Refs = [quantityRef, restockDateRef, addedStockRef];
+const step2Refs = [productNameRef, modelRef, priceRef, supplierIdRef];
+
+// Focus next input on Enter
+function focusNextInput(currentIndex, refsArray) {
+  if (currentIndex < refsArray.length - 1) {
+    refsArray[currentIndex + 1].value?.focus();
+  }
+}
+
 </script>
 
 <template>
@@ -1739,15 +1760,36 @@ const submitSupplierPayment = async () => {
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <FormField>
                       <FormLabel>Quantity <span class="text-red-500">*</span></FormLabel>
-                      <input v-model="newItem.quantity" type="number" class="form-input" required placeholder="Enter quantity" />
+                      <input
+                        v-model="newItem.quantity"
+                        type="number"
+                        class="form-input"
+                        required
+                        placeholder="Enter quantity"
+                        ref="quantityRef"
+                        @keydown.enter="focusNextInput(0, step1Refs)"
+                      />
                     </FormField>
                     <FormField>
                       <FormLabel>Restock Date & Time <span class="text-red-500">*</span></FormLabel>
-                      <input v-model="newItem.restock_date_time" type="datetime-local" class="form-input" />
+                      <input
+                        v-model="newItem.restock_date_time"
+                        type="datetime-local"
+                        class="form-input"
+                        ref="restockDateRef"
+                        @keydown.enter="focusNextInput(1, step1Refs)"
+                      />
                     </FormField>
                     <FormField>
                       <FormLabel>Added Stock Amount <span class="text-red-500">*</span></FormLabel>
-                      <input v-model="newItem.added_stock_amount" type="number" class="form-input" placeholder="0" />
+                      <input
+                        v-model="newItem.added_stock_amount"
+                        type="number"
+                        class="form-input"
+                        placeholder="0"
+                        ref="addedStockRef"
+                        @keydown.enter="focusNextInput(2, step1Refs)"
+                      />
                     </FormField>
                   </div>
                   <div class="flex justify-end gap-3 mt-8">
@@ -1762,19 +1804,52 @@ const submitSupplierPayment = async () => {
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <FormField>
                       <FormLabel>Product Name <span class="text-red-500">*</span></FormLabel>
-                      <input v-model="newProduct.name" type="text" class="form-input" required placeholder="e.g. Banner 13" />
+                      <input
+                        v-model="newProduct.name"
+                        type="text"
+                        class="form-input"
+                        required
+                        placeholder="e.g. Banner 13"
+                        ref="productNameRef"
+                        @keydown.enter="focusNextInput(0, step2Refs)"
+                      />
                     </FormField>
                     <FormField>
                       <FormLabel>Model <span class="text-red-500">*</span></FormLabel>
-                      <input v-model="newProduct.model" type="text" class="form-input" required placeholder="e.g. STV" />
+                      <input
+                        v-model="newProduct.model"
+                        type="text"
+                        class="form-input"
+                        required
+                        placeholder="e.g. STV"
+                        ref="modelRef"
+                        @keydown.enter="focusNextInput(1, step2Refs)"
+                      />
                     </FormField>
                     <FormField>
                       <FormLabel>Price <span class="text-red-500">*</span></FormLabel>
-                      <input v-model="newProduct.price" type="number" step="0.01" class="form-input" required placeholder="e.g. 1000.00" />
+                      <input
+                        v-model="newProduct.price"
+                        type="number"
+                        step="0.01"
+                        class="form-input"
+                        required
+                        placeholder="e.g. 1000.00"
+                        ref="priceRef"
+                        @keydown.enter="focusNextInput(2, step2Refs)"
+                      />
                     </FormField>
                     <FormField>
                       <FormLabel>Supplier ID <span class="text-red-500">*</span></FormLabel>
-                      <input v-model="newProduct.supplier_id" type="number" class="form-input" required placeholder="e.g. 1" />
+                      <input
+                        v-model="newProduct.supplier_id"
+                        type="number"
+                        class="form-input"
+                        required
+                        placeholder="e.g. 1"
+                        ref="supplierIdRef"
+                        @keydown.enter="focusNextInput(3, step2Refs)"
+                      />
                     </FormField>
                   </div>
                   <div class="flex justify-end gap-3 mt-8">

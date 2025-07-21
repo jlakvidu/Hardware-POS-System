@@ -1,6 +1,6 @@
 <script setup>
 import { useRouter } from 'vue-router' 
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import Header from './Header.vue'
 import Sidebar from './Sidebar.vue'
 import SidebarCashier from './Sidebar-cashier.vue' // Add this import
@@ -402,6 +402,19 @@ const clearOrder = () => {
   customerName.value = 'Walk-in Customer'
   applyDiscount.value = false
   customDiscountRate.value = 10
+  // Reset advance payment fields
+  isAdvancePayment.value = false
+  advanceAmount.value = 0
+  // Reset check payment fields
+  checkDetails.value = {
+    bankName: '',
+    checkNumber: '',
+    checkDate: new Date().toISOString().split('T')[0],
+    amount: 0,
+    remarks: ''
+  }
+  // Reset payment method to cash
+  selectedPaymentMethod.value = 'CASH'
 }
 
 const openPaymentModal = () => {
@@ -487,6 +500,18 @@ const handleAdvancePayment = async () => {
     if (response.status === 201) {
       orderId.value = response.data.data.id;
       isPaymentModalOpen.value = false;
+      // Reset advance/check fields after payment
+      isAdvancePayment.value = false
+      advanceAmount.value = 0
+      checkDetails.value = {
+        bankName: '',
+        checkNumber: '',
+        checkDate: new Date().toISOString().split('T')[0],
+        amount: 0,
+        remarks: ''
+      }
+      // Reset payment method to cash
+      selectedPaymentMethod.value = 'CASH'
 
       Swal.fire({
         title: 'Advance Payment Recorded!',
@@ -581,6 +606,18 @@ const completeOrder = async () => {
       orderId.value = response.data.data.id;
 
       isPaymentModalOpen.value = false;
+      // Reset advance/check fields after payment
+      isAdvancePayment.value = false
+      advanceAmount.value = 0
+      checkDetails.value = {
+        bankName: '',
+        checkNumber: '',
+        checkDate: new Date().toISOString().split('T')[0],
+        amount: 0,
+        remarks: ''
+      }
+      // Reset payment method to cash
+      selectedPaymentMethod.value = 'CASH'
       console.log('Order completed successfully!');
 
       Swal.fire({
@@ -827,6 +864,46 @@ const handleCheckPaymentSubmit = () => {
 watch(() => total.value, (newTotal) => {
   if (selectedPaymentMethod.value === 'CHECK') {
     checkDetails.value.amount = newTotal
+  }
+})
+
+// Add refs for check payment fields
+const checkBankNameRef = ref(null)
+const checkNumberRef = ref(null)
+const checkDateRef = ref(null)
+const checkRemarksRef = ref(null)
+
+// Focus navigation for check payment fields
+const focusNextCheckField = (current, next) => {
+  if (current && next) {
+    current.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        next.focus()
+      }
+    })
+  }
+}
+
+// Watch for modal open and set up navigation
+watch(() => showCheckForm.value, async (show) => {
+  if (show) {
+    await nextTick()
+    // Setup navigation: Bank Name → Check Number → Check Date → Remarks
+    focusNextCheckField(checkBankNameRef.value, checkNumberRef.value)
+    focusNextCheckField(checkNumberRef.value, checkDateRef.value)
+    focusNextCheckField(checkDateRef.value, checkRemarksRef.value)
+    // Enter on Remarks submits the form
+    if (checkRemarksRef.value) {
+      checkRemarksRef.value.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          handleCheckPaymentSubmit()
+        }
+      })
+    }
+    // Focus first field
+    if (checkBankNameRef.value) checkBankNameRef.value.focus()
   }
 })
 </script>
@@ -1215,171 +1292,170 @@ watch(() => total.value, (newTotal) => {
 
     <div v-if="isPaymentModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" @click="isPaymentModalOpen = false"></div>
-
-      <div class="relative bg-gray-800 rounded-lg shadow-xl border border-gray-700/50 w-full max-w-md p-6 z-10 animate-scale-in">
-        <div class="flex justify-between items-center mb-5">
+      <div
+        class="relative bg-gray-800 rounded-lg shadow-xl border border-gray-700/50 w-full max-w-full sm:max-w-md p-0 z-10 animate-scale-in flex flex-col"
+        style="max-height: 90vh;"
+      >
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-0 p-6 border-b border-gray-700/50">
           <h2 class="text-xl font-bold text-gray-200">Complete Payment</h2>
           <button @click="isPaymentModalOpen = false" class="p-1.5 hover:bg-gray-700/50 rounded-full transition-colors">
             <X class="w-5 h-5" />
           </button>
         </div>
+        <!-- Scrollable Content -->
+        <div class="flex-1 overflow-y-auto p-6 space-y-5">
+          <div class="mb-5">
+            <div class="flex items-center justify-between mb-3">
+              <div class="text-sm text-gray-400">Order Total</div>
+              <div class="text-2xl font-bold text-white">{{ formatCurrency(total) }}</div>
+            </div>
 
-        <div class="mb-5">
-          <div class="flex items-center justify-between mb-3">
-            <div class="text-sm text-gray-400">Order Total</div>
-            <div class="text-2xl font-bold text-white">{{ formatCurrency(total) }}</div>
-          </div>
+            <!-- Add Payment Method Selection -->
+            <div class="bg-gray-700/30 rounded-lg p-4 mb-4">
+              <label class="text-sm text-gray-400 mb-3 block">Payment Method</label>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <button 
+                  v-for="method in ['CASH', 'CARD', 'CHECK', 'ONLINE']" 
+                  :key="method"
+                  @click="selectedPaymentMethod = method"
+                  :class="[
+                    'p-3 rounded-lg border transition-all duration-200 flex flex-col items-center gap-2',
+                    selectedPaymentMethod === method 
+                      ? 'bg-blue-500/20 border-blue-500/50 text-white' 
+                      : 'bg-gray-700/50 border-gray-600/50 text-gray-400 hover:bg-gray-600/50'
+                  ]"
+                >
+                  <component :is="{
+                    'CASH': Banknote,
+                    'CARD': CreditCard,
+                    'CHECK': FileText,
+                    'ONLINE': FileText
+                  }[method]" class="w-5 h-5" />
+                  <span class="text-sm">{{ method }}</span>
+                </button>
+              </div>
+            </div>
 
-          <!-- Add Payment Method Selection -->
-          <div class="bg-gray-700/30 rounded-lg p-4 mb-4">
-            <label class="text-sm text-gray-400 mb-3 block">Payment Method</label>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
-              <button 
-                v-for="method in ['CASH', 'CARD', 'CHECK', 'ONLINE']" 
-                :key="method"
-                @click="selectedPaymentMethod = method"
-                :class="[
-                  'p-3 rounded-lg border transition-all duration-200 flex flex-col items-center gap-2',
-                  selectedPaymentMethod === method 
-                    ? 'bg-blue-500/20 border-blue-500/50 text-white' 
-                    : 'bg-gray-700/50 border-gray-600/50 text-gray-400 hover:bg-gray-600/50'
-                ]"
-              >
-                <component :is="{
-                  'CASH': Banknote,
-                  'CARD': CreditCard,
-                  'CHECK': FileText,
-                  'ONLINE': FileText
-                }[method]" class="w-5 h-5" />
-                <span class="text-sm">{{ method }}</span>
-              </button>
+            <!-- Advanced Payment Toggle -->
+            <div class="bg-gray-700/30 rounded-lg p-4">
+              <label class="flex items-center justify-between">
+                <span class="text-sm text-gray-300">Enable Advance Payment</span>
+                <div class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" v-model="isAdvancePayment" class="sr-only peer" />
+                  <div class="w-11 h-6 bg-gray-600 rounded-full peer peer-checked:after:translate-x-full 
+                            peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 
+                            after:left-[2px] after:bg-white after:border-gray-300 after:border 
+                            after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500">
+                  </div>
+                </div>
+              </label>
+
+              <transition name="fade">
+                <div v-if="isAdvancePayment" class="mt-4 space-y-4">
+                  <div>
+                    <label class="text-sm text-gray-400 mb-2 block">Advance Amount</label>
+                    <div class="relative">
+                      <input 
+                        type="number"
+                        v-model="advanceAmount"
+                        :max="total"
+                        class="w-full bg-gray-600/50 border border-gray-500 rounded-lg px-3 py-2 text-white"
+                        @input="advanceAmount = Math.min(Math.max(0, advanceAmount), total)"
+                      />
+                      <div class="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">
+                        {{ ((advanceAmount / total) * 100).toFixed(0) }}%
+                      </div>
+                    </div>
+
+                    <!-- Payment Progress Bar -->
+                    <div class="mt-2 bg-gray-600 rounded-full h-2 overflow-hidden">
+                      <div class="bg-blue-500 h-full transition-all duration-300"
+                           :style="{ width: `${(advanceAmount / total) * 100}%` }">
+                      </div>
+                    </div>
+
+                    <!-- Payment Breakdown -->
+                    <div class="mt-4 space-y-2 text-sm">
+                      <div class="flex justify-between text-gray-400">
+                        <span>Advance Payment:</span>
+                        <span class="text-blue-400">{{ formatCurrency(advanceAmount) }}</span>
+                      </div>
+                      <div class="flex justify-between text-gray-400">
+                        <span>Remaining Balance:</span>
+                        <span class="text-yellow-400">{{ formatCurrency(remainingBalance) }}</span>
+                      </div>
+                      <div class="flex justify-between text-gray-400 pt-2 border-t border-gray-600">
+                        <span>Payment Status:</span>
+                        <span :class="{
+                          'text-green-400': paymentStatus === 'PAID',
+                          'text-yellow-400': paymentStatus === 'PARTIALLY_PAID',
+                          'text-red-400': paymentStatus === 'PENDING'
+                        }">
+                          {{ paymentStatus.replace('_', ' ') }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </transition>
             </div>
           </div>
 
-          <!-- Advanced Payment Toggle -->
-          <div class="bg-gray-700/30 rounded-lg p-4">
-            <label class="flex items-center justify-between">
-              <span class="text-sm text-gray-300">Enable Advance Payment</span>
-              <div class="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" v-model="isAdvancePayment" class="sr-only peer" />
-                <div class="w-11 h-6 bg-gray-600 rounded-full peer peer-checked:after:translate-x-full 
-                          peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 
-                          after:left-[2px] after:bg-white after:border-gray-300 after:border 
-                          after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500">
-                </div>
-              </div>
-            </label>
-
-            <transition name="fade">
-              <div v-if="isAdvancePayment" class="mt-4 space-y-4">
+          <!-- Add this inside your payment modal, after the payment method selection -->
+          <transition name="fade">
+            <div v-if="showCheckForm" class="mt-4 bg-gray-700/30 rounded-lg p-4 space-y-4">
+              <div class="text-sm font-medium text-gray-300 mb-2">Check Payment Details</div>
+              
+              <div class="space-y-3">
                 <div>
-                  <label class="text-sm text-gray-400 mb-2 block">Advance Amount</label>
-                  <div class="relative">
-                    <input 
-                      type="number"
-                      v-model="advanceAmount"
-                      :max="total"
-                      class="w-full bg-gray-600/50 border border-gray-500 rounded-lg px-3 py-2 text-white"
-                      @input="advanceAmount = Math.min(Math.max(0, advanceAmount), total)"
-                    />
-                    <div class="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">
-                      {{ ((advanceAmount / total) * 100).toFixed(0) }}%
-                    </div>
-                  </div>
+                  <label class="block text-sm text-gray-400 mb-1">Bank Name</label>
+                  <input 
+                    type="text"
+                    v-model="checkDetails.bankName"
+                    ref="checkBankNameRef"
+                    class="w-full bg-gray-600/50 border border-gray-500 rounded-lg px-3 py-2 text-white placeholder-gray-400"
+                    placeholder="Enter bank name"
+                  />
+                </div>
 
-                  <!-- Payment Progress Bar -->
-                  <div class="mt-2 bg-gray-600 rounded-full h-2 overflow-hidden">
-                    <div class="bg-blue-500 h-full transition-all duration-300"
-                         :style="{ width: `${(advanceAmount / total) * 100}%` }">
-                    </div>
-                  </div>
+                <div>
+                  <label class="block text-sm text-gray-400 mb-1">Check Number</label>
+                  <input 
+                    type="text"
+                    v-model="checkDetails.checkNumber"
+                    ref="checkNumberRef"
+                    class="w-full bg-gray-600/50 border border-gray-500 rounded-lg px-3 py-2 text-white placeholder-gray-400"
+                    placeholder="Enter check number"
+                  />
+                </div>
 
-                  <!-- Payment Breakdown -->
-                  <div class="mt-4 space-y-2 text-sm">
-                    <div class="flex justify-between text-gray-400">
-                      <span>Advance Payment:</span>
-                      <span class="text-blue-400">{{ formatCurrency(advanceAmount) }}</span>
-                    </div>
-                    <div class="flex justify-between text-gray-400">
-                      <span>Remaining Balance:</span>
-                      <span class="text-yellow-400">{{ formatCurrency(remainingBalance) }}</span>
-                    </div>
-                    <div class="flex justify-between text-gray-400 pt-2 border-t border-gray-600">
-                      <span>Payment Status:</span>
-                      <span :class="{
-                        'text-green-400': paymentStatus === 'PAID',
-                        'text-yellow-400': paymentStatus === 'PARTIALLY_PAID',
-                        'text-red-400': paymentStatus === 'PENDING'
-                      }">
-                        {{ paymentStatus.replace('_', ' ') }}
-                      </span>
-                    </div>
-                  </div>
+                <div>
+                  <label class="block text-sm text-gray-400 mb-1">Check Date</label>
+                  <input 
+                    type="date"
+                    v-model="checkDetails.checkDate"
+                    ref="checkDateRef"
+                    class="w-full bg-gray-600/50 border border-gray-500 rounded-lg px-3 py-2 text-white"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-sm text-gray-400 mb-1">Remarks (Optional)</label>
+                  <textarea 
+                    v-model="checkDetails.remarks"
+                    ref="checkRemarksRef"
+                    rows="2"
+                    class="w-full bg-gray-600/50 border border-gray-500 rounded-lg px-3 py-2 text-white placeholder-gray-400"
+                    placeholder="Add any additional notes"
+                  ></textarea>
                 </div>
               </div>
-            </transition>
-          </div>
-        </div>
-
-        <!-- Add this inside your payment modal, after the payment method selection -->
-        <transition name="fade">
-          <div v-if="showCheckForm" class="mt-4 bg-gray-700/30 rounded-lg p-4 space-y-4">
-            <div class="text-sm font-medium text-gray-300 mb-2">Check Payment Details</div>
-            
-            <div class="space-y-3">
-              <div>
-                <label class="block text-sm text-gray-400 mb-1">Bank Name</label>
-                <input 
-                  type="text"
-                  v-model="checkDetails.bankName"
-                  class="w-full bg-gray-600/50 border border-gray-500 rounded-lg px-3 py-2 text-white placeholder-gray-400"
-                  placeholder="Enter bank name"
-                />
-              </div>
-
-              <div>
-                <label class="block text-sm text-gray-400 mb-1">Check Number</label>
-                <input 
-                  type="text"
-                  v-model="checkDetails.checkNumber"
-                  class="w-full bg-gray-600/50 border border-gray-500 rounded-lg px-3 py-2 text-white placeholder-gray-400"
-                  placeholder="Enter check number"
-                />
-              </div>
-
-              <div>
-                <label class="block text-sm text-gray-400 mb-1">Check Date</label>
-                <input 
-                  type="date"
-                  v-model="checkDetails.checkDate"
-                  class="w-full bg-gray-600/50 border border-gray-500 rounded-lg px-3 py-2 text-white"
-                />
-              </div>
-
-              <div>
-                <label class="block text-sm text-gray-400 mb-1">Amount</label>
-                <input 
-                  type="number"
-                  v-model="checkDetails.amount"
-                  readonly
-                  class="w-full bg-gray-600/50 border border-gray-500 rounded-lg px-3 py-2 text-white cursor-not-allowed"
-                />
-              </div>
-
-              <div>
-                <label class="block text-sm text-gray-400 mb-1">Remarks (Optional)</label>
-                <textarea 
-                  v-model="checkDetails.remarks"
-                  rows="2"
-                  class="w-full bg-gray-600/50 border border-gray-500 rounded-lg px-3 py-2 text-white placeholder-gray-400"
-                  placeholder="Add any additional notes"
-                ></textarea>
-              </div>
             </div>
-          </div>
-        </transition>
-
-        <div class="flex gap-3">
+          </transition>
+        </div>
+        <!-- Sticky Footer -->
+        <div class="p-4 border-t border-gray-700/50 bg-gray-800 flex gap-3">
           <button @click="isPaymentModalOpen = false"
             class="flex-1 py-3 px-4 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors duration-200 text-sm text-white">
             Cancel
@@ -1653,7 +1729,7 @@ watch(() => total.value, (newTotal) => {
             <button @click="isCustomerModalOpen = false" 
                     class="p-2 hover:bg-gray-700/50 rounded-full transition-colors">
               <X class="w-5 h-5" />
-            </button>
+                       </button>
           </div>
           
           <!-- Search Bar -->
@@ -1990,6 +2066,12 @@ input[type="range"]::-moz-range-thumb:hover {
   }
   50% {
     opacity: 0.7;
+  }
+}
+
+@media (max-width: 640px) {
+  .modal-content-scroll {
+    padding: 1rem !important;
   }
 }
 </style>
