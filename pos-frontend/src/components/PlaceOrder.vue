@@ -230,13 +230,15 @@ const openDimensionsModal = (item) => {
     title: 'Enter Banner Dimensions',
     html: `
       <div class="space-y-4">
-        <div>
-          <label class="block text-sm text-gray-400 mb-1">Width (inches)</label>
-          <input id="width" type="number" min="1" step="0.1" value="${item.width || ''}" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white" />
-        </div>
-        <div>
-          <label class="block text-sm text-gray-400 mb-1">Height (inches)</label>
-          <input id="height" type="number" min="1" step="0.1" value="${item.height || ''}" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white" />
+        <div class="flex gap-4">
+          <div class="flex-1">
+            <label class="block text-sm text-gray-400 mb-1">Width (inches)</label>
+            <input id="width" type="number" min="1" step="0.1" value="${item.width || ''}" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white" />
+          </div>
+          <div class="flex-1">
+            <label class="block text-sm text-gray-400 mb-1">Height (inches)</label>
+            <input id="height" type="number" min="1" step="0.1" value="${item.height || ''}" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white" />
+          </div>
         </div>
         <div class="mt-4 p-3 bg-gray-800 rounded-lg">
           <div class="text-sm text-gray-400">Preview:</div>
@@ -252,7 +254,26 @@ const openDimensionsModal = (item) => {
       const width = document.getElementById('width');
       const height = document.getElementById('height');
       const preview = document.getElementById('preview');
-      
+
+      // Focus width input on open
+      width.focus();
+
+      // Enter on width moves to height
+      width.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          height.focus();
+        }
+      });
+
+      // Enter on height triggers confirm
+      height.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          document.querySelector('.swal2-confirm').click();
+        }
+      });
+
       const updatePreview = () => {
         const w = parseFloat(width.value);
         const h = parseFloat(height.value);
@@ -264,9 +285,11 @@ const openDimensionsModal = (item) => {
               <div class="text-green-400">${sqMeters} m²</div>
             </div>
           `;
+        } else {
+          preview.innerHTML = 'Enter dimensions to see preview';
         }
       };
-      
+
       width.addEventListener('input', updatePreview);
       height.addEventListener('input', updatePreview);
     },
@@ -944,30 +967,30 @@ watch(() => total.value, (newTotal) => {
 
         <div class="w-full md:w-[25%] lg:w-[20%]">
           <div
-            class="bg-[#1a2234] rounded-lg border border-[#334155] flex flex-col h-[calc(100vh-100px)] sticky top-24 shadow-lg">
+            class="bg-[#1a2234] rounded-lg border border-[#334155] flex flex-col h-auto md:h-[calc(100vh-100px)] sticky top-24 shadow-lg w-full md:w-[350px] max-w-full"
+          >
             <div class="p-4 border-b border-gray-700/50 bg-[#1e293b]">
               <div class="flex justify-between items-center mb-3">
                 <h2 class="font-bold text-gray-200 text-base flex items-center gap-1.5">
                   <ShoppingCart class="w-4 h-4 text-blue-400" />
-                  Order Summary
+                  order summary
                 </h2>
               </div>
-
               <div class="mb-3">
                 <label class="block text-xs text-gray-400 mb-1.5 flex items-center justify-between">
                   <div class="flex items-center gap-1">
                     <User class="w-3 h-3" />
-                    <span>Customer Information</span>
+                    <span>customer information</span>
                   </div>
                   <div class="flex items-center gap-2">
-                    <button @click="navigateToCustomers" 
-                            title="Add New Customer"
+                    <button @click="navigateToCustomers"
+                            title="Add new customer"
                             class="p-1 hover:bg-gray-700/50 rounded-full transition-colors group">
                       <UserPlusIcon class="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform" />
                     </button>
                     <button @click="isCustomerModalOpen = true"
                             class="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded-full hover:bg-blue-500/30 transition-colors">
-                      Select Customer
+                      select customer
                     </button>
                   </div>
                 </label>
@@ -975,10 +998,10 @@ watch(() => total.value, (newTotal) => {
                   <div class="flex items-center justify-between">
                     <div>
                       <div class="text-sm text-white font-medium flex items-center gap-2">
-                        {{ selectedCustomer ? selectedCustomer.name : 'No Customer Selected' }}
-                        <span v-if="!selectedCustomer" 
+                        {{ selectedCustomer ? selectedCustomer.name : 'no customer selected' }}
+                        <span v-if="!selectedCustomer"
                               class="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full">
-                          Please select a customer
+                          please select a customer
                         </span>
                       </div>
                       <div v-if="selectedCustomer" class="text-xs text-gray-400 mt-1 space-y-0.5">
@@ -995,7 +1018,7 @@ watch(() => total.value, (newTotal) => {
                     <button v-if="selectedCustomer"
                             @click="clearSelectedCustomer"
                             class="p-1.5 hover:bg-gray-600/50 rounded-full group"
-                            title="Clear Selection">
+                            title="Clear selection">
                       <X class="w-4 h-4 text-gray-400 group-hover:text-red-400 transition-colors" />
                     </button>
                   </div>
@@ -1006,8 +1029,8 @@ watch(() => total.value, (newTotal) => {
             <div class="flex-1 overflow-auto p-4 custom-scrollbar">
               <div v-if="orderItems.length === 0" class="text-center py-10 text-gray-500">
                 <ShoppingCart class="w-12 h-12 mx-auto mb-3 opacity-30" />
-                <p class="text-sm font-medium">Your cart is empty</p>
-                <p class="text-xs mt-1">Click on products to add them to your order</p>
+                <p class="text-sm font-medium">your cart is empty</p>
+                <p class="text-xs mt-1">click on products to add them to your order</p>
               </div>
 
               <div v-else class="space-y-3">
@@ -1106,7 +1129,7 @@ watch(() => total.value, (newTotal) => {
             <div class="p-4 border-t border-gray-700/50 bg-[#1e293b]">
               <div class="space-y-2 mb-4 text-sm">
                 <div class="flex justify-between text-gray-300">
-                  <span>Subtotal</span>
+                  <span>subtotal</span>
                   <span>Rs. {{ subtotal.toLocaleString() }}</span>
                 </div>
                 
@@ -1158,33 +1181,30 @@ watch(() => total.value, (newTotal) => {
                 </div>
 
                 <div class="flex justify-between font-bold pt-2 border-t border-gray-700/50 text-white">
-                  <span>Total</span>
+                  <span>total</span>
                   <span>Rs. {{ total.toLocaleString() }}</span>
                 </div>
               </div>
 
               <div class="grid grid-cols-3 gap-2">
                 <button @click="clearOrder"
-                  class="py-2 px-3 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-lg transition-colors duration-200 flex items-center justify-center gap-1.5 text-sm">
+                  class="py-2 px-3 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-lg transition-colors duration-200 flex items-center justify-center gap-1.5 text-sm lowercase">
                   <Trash2 class="w-4 h-4" />
-                  <span>Clear</span>
+                  clear
                 </button>
-
-                <!-- New Quotation Button -->
                 <button @click="generateQuotation"
-                  class="py-2 px-3 bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 rounded-lg transition-colors duration-200 flex items-center justify-center gap-1.5 text-sm">
+                  class="py-2 px-3 bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 rounded-lg transition-colors duration-200 flex items-center justify-center gap-1.5 text-sm lowercase">
                   <FileText class="w-4 h-4" />
-                  <span>Quotation</span>
+                  quotation
                 </button>
-
-                <button @click="openPaymentModal" :disabled="orderItems.length === 0" :class="[ 
-                  'py-2 px-3 rounded-lg transition-colors duration-200 flex items-center justify-center gap-1.5 text-sm',
+                <button @click="openPaymentModal" :disabled="orderItems.length === 0" :class="[
+                  'py-2 px-3 rounded-lg transition-colors duration-200 flex items-center justify-center gap-1.5 text-sm lowercase',
                   orderItems.length === 0
                     ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
                     : 'bg-blue-500 hover:bg-blue-600 text-white'
                 ]">
                   <CreditCard class="w-4 h-4" />
-                  <span>Checkout</span>
+                  checkout
                 </button>
               </div>
             </div>

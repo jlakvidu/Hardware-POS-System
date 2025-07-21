@@ -407,7 +407,7 @@ const formatTime = (dateString) => {
               <h1
                 class="text-2xl font-bold bg-gradient-to-r from-[#4dabf7] to-[#3b82f6] bg-clip-text text-transparent flex items-center gap-2">
                 <RotateCcw class="w-6 h-6 text-[#4dabf7]" />
-                Return Items Management
+                Return Orders Management
               </h1>
               <p class="text-gray-400 text-sm mt-1">View and manage returned items efficiently</p>
             </div>
@@ -784,117 +784,81 @@ const formatTime = (dateString) => {
       <!-- Detail Modal -->
       <div v-if="isDetailModalOpen && currentReturnDetail" class="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
         <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" @click="isDetailModalOpen = false"></div>
+        <div class="relative bg-gradient-to-br from-[#1a2234] via-[#161d2b] to-[#1a2234] rounded-2xl shadow-2xl border border-[#334155]/50 w-full max-w-2xl p-8 z-10 animate-slide-up max-h-[90vh] overflow-auto custom-scrollbar">
+          <!-- Close Button -->
+          <button @click="isDetailModalOpen = false"
+            class="absolute top-6 right-6 p-2.5 bg-[#232c3b] hover:bg-[#334155] border border-[#334155] rounded-full transition-all duration-300 group"
+            aria-label="Close details">
+            <X class="w-5 h-5 text-gray-400 group-hover:text-white transition-colors" />
+          </button>
 
-        <div class="relative bg-gradient-to-br from-[#1a2234] via-[#161d2b] to-[#1a2234] rounded-2xl shadow-2xl border border-[#334155]/50 w-full max-w-3xl p-8 z-10 animate-slide-up max-h-[90vh] overflow-auto custom-scrollbar">
           <!-- Header -->
-          <div class="absolute top-6 right-6 flex gap-2">
-            <button @click="isDetailModalOpen = false" 
-              class="p-2.5 bg-[#1e293b]/80 hover:bg-[#263244] border border-[#334155] rounded-lg transition-all duration-300 group" 
-              aria-label="Close details">
-              <X class="w-5 h-5 text-gray-400 group-hover:text-white transition-colors" />
-            </button>
-          </div>
-
-          <div class="mb-8">
-            <div class="inline-flex items-center px-3 py-1.5 bg-blue-500/10 rounded-full mb-4">
-              <span class="text-blue-400 text-sm font-medium">Return Details</span>
+          <div class="mb-8 flex items-center gap-4">
+            <div class="p-4 bg-gradient-to-br from-blue-500/20 to-blue-600/10 border border-blue-500/20 rounded-xl">
+              <Package class="w-8 h-8 text-blue-400" />
             </div>
-            <div class="flex items-center gap-3">
-              <div class="p-3 bg-gradient-to-br from-blue-500/20 to-blue-600/10 border border-blue-500/20 rounded-xl">
-                <Package class="w-7 h-7 text-blue-400" />
-              </div>
-              <div>
-                <h2 class="text-2xl font-bold text-white">
-                  Return #{{ currentReturnDetail.id }}
-                </h2>
-                <p class="text-gray-400 text-sm mt-1">Detailed information about this return</p>
-              </div>
+            <div>
+              <h2 class="text-3xl font-extrabold text-white tracking-tight">Return #{{ currentReturnDetail.id }}</h2>
+              <p class="text-gray-400 text-base mt-1">Detailed information about this return</p>
             </div>
           </div>
 
-          <div class="space-y-6">
-            <!-- Info Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <!-- Product Info Card -->
-              <div class="bg-[#1e293b]/40 backdrop-blur-sm rounded-xl border border-[#334155]/50 overflow-hidden">
-                <div class="p-5 border-b border-[#334155]/50">
-                  <h3 class="text-sm font-semibold text-gray-300 flex items-center gap-2">
-                    <Package class="w-4 h-4 text-blue-400" />
-                    Product Information
-                  </h3>
-                </div>
-                <div class="p-5">
-                  <div class="flex items-center gap-4">
-                    <div class="w-14 h-14 rounded-xl flex items-center justify-center bg-gradient-to-br from-blue-500/20 to-blue-600/10 border border-blue-500/20">
-                      <Package class="w-7 h-7 text-blue-400" />
-                    </div>
-                    <div>
-                      <div class="text-sm text-gray-400">Product ID</div>
-                      <div class="text-lg font-semibold text-white mt-1">{{ currentReturnDetail.product_id }}</div>
-                    </div>
-                  </div>
-                </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <!-- Product Info -->
+            <div class="bg-[#232c3b]/80 rounded-xl border border-[#334155]/50 p-6 flex flex-col gap-2 shadow">
+              <div class="flex items-center gap-2 mb-2">
+                <Package class="w-5 h-5 text-blue-400" />
+                <span class="text-sm font-semibold text-gray-300">Product Information</span>
               </div>
-
-              <!-- Return Details Card -->
-              <div class="bg-[#1e293b]/40 backdrop-blur-sm rounded-xl border border-[#334155]/50 overflow-hidden">
-                <div class="p-5 border-b border-[#334155]/50">
-                  <h3 class="text-sm font-semibold text-gray-300 flex items-center gap-2">
-                    <RotateCcw class="w-4 h-4 text-blue-400" />
-                    Return Details
-                  </h3>
+              <div class="text-xs text-gray-400">Product ID</div>
+              <div class="text-xl font-bold text-white">{{ currentReturnDetail.product_id }}</div>
+            </div>
+            <!-- Return Details -->
+            <div class="bg-[#232c3b]/80 rounded-xl border border-[#334155]/50 p-6 flex flex-col gap-2 shadow">
+              <div class="flex items-center gap-2 mb-2">
+                <RotateCcw class="w-5 h-5 text-blue-400" />
+                <span class="text-sm font-semibold text-gray-300">Return Details</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <div>
+                  <div class="text-xs text-gray-400">Quantity</div>
+                  <div class="text-xl font-bold text-white">{{ currentReturnDetail.quantity }}</div>
                 </div>
-                <div class="p-5 space-y-4">
-                  <div class="flex items-center justify-between">
-                    <div class="text-sm text-gray-400">Quantity</div>
-                    <div class="text-lg font-semibold text-white">{{ currentReturnDetail.quantity }}</div>
-                  </div>
-                  <div class="flex items-center justify-between">
-                    <div class="text-sm text-gray-400">Return Date</div>
-                    <div class="text-white">{{ formatDate(currentReturnDetail.created_at) }}</div>
-                  </div>
+                <div>
+                  <div class="text-xs text-gray-400">Return Date</div>
+                  <div class="text-lg text-white">{{ formatDate(currentReturnDetail.created_at) }}</div>
                 </div>
               </div>
             </div>
+          </div>
 
-            <!-- Return Reason Card -->
-            <div class="bg-[#1e293b]/40 backdrop-blur-sm rounded-xl border border-[#334155]/50 overflow-hidden">
-              <div class="p-5 border-b border-[#334155]/50">
-                <h3 class="text-sm font-semibold text-gray-300 flex items-center gap-2">
-                  <AlertCircle class="w-4 h-4 text-blue-400" />
-                  Return Reason
-                </h3>
-              </div>
-              <div class="p-5">
-                <p class="text-white leading-relaxed">{{ currentReturnDetail.reason }}</p>
-              </div>
+          <!-- Return Reason -->
+          <div class="bg-[#232c3b]/80 rounded-xl border border-[#334155]/50 p-6 mb-6 shadow">
+            <div class="flex items-center gap-2 mb-2">
+              <AlertCircle class="w-5 h-5 text-blue-400" />
+              <span class="text-sm font-semibold text-gray-300">Return Reason</span>
             </div>
+            <p class="text-white text-base leading-relaxed">{{ currentReturnDetail.reason }}</p>
+          </div>
 
-            <!-- Related Sale Card -->
-            <div v-if="currentReturnDetail.sales_id" 
-              class="bg-[#1e293b]/40 backdrop-blur-sm rounded-xl border border-[#334155]/50 overflow-hidden">
-              <div class="p-5 border-b border-[#334155]/50">
-                <h3 class="text-sm font-semibold text-gray-300 flex items-center gap-2">
-                  <Eye class="w-4 h-4 text-blue-400" />
-                  Related Sale
-                </h3>
-              </div>
-              <div class="p-5">
-                <a href="#" 
-                  class="group flex items-center gap-4 p-4 bg-[#1e293b]/60 rounded-xl hover:bg-[#263244] border border-[#334155] transition-all duration-300">
-                  <div class="p-3 rounded-lg bg-gradient-to-br from-blue-500/20 to-blue-600/10 border border-blue-500/20">
-                    <Package class="w-5 h-5 text-blue-400" />
-                  </div>
-                  <div class="flex-1">
-                    <div class="text-sm text-gray-400">Original Sale</div>
-                    <div class="text-lg font-semibold text-white group-hover:text-blue-400 transition-colors">
-                      #{{ currentReturnDetail.sales_id }}
-                    </div>
-                  </div>
-                  <ChevronRight class="w-5 h-5 text-gray-400 group-hover:text-blue-400 transition-colors" />
-                </a>
-              </div>
+          <!-- Related Sale -->
+          <div v-if="currentReturnDetail.sales_id" class="bg-[#232c3b]/80 rounded-xl border border-[#334155]/50 p-6 shadow">
+            <div class="flex items-center gap-2 mb-2">
+              <Eye class="w-5 h-5 text-blue-400" />
+              <span class="text-sm font-semibold text-gray-300">Related Sale</span>
             </div>
+            <a href="#" class="flex items-center gap-4 p-4 bg-[#1e293b]/60 rounded-xl hover:bg-[#263244] border border-[#334155] transition-all duration-300 group">
+              <div class="p-3 rounded-lg bg-gradient-to-br from-blue-500/20 to-blue-600/10 border border-blue-500/20">
+                <Package class="w-5 h-5 text-blue-400" />
+              </div>
+              <div class="flex-1">
+                <div class="text-xs text-gray-400">Original Sale</div>
+                <div class="text-lg font-semibold text-white group-hover:text-blue-400 transition-colors">
+                  #{{ currentReturnDetail.sales_id }}
+                </div>
+              </div>
+              <ChevronRight class="w-5 h-5 text-gray-400 group-hover:text-blue-400 transition-colors" />
+            </a>
           </div>
         </div>
       </div>

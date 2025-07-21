@@ -1309,189 +1309,93 @@ const showSidebar = () => { isSidebarVisible.value = true }
           </div>
         </div>
 
-        <div v-if="showViewModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div class="bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl w-full max-w-xl p-6 shadow-2xl border border-slate-700/50 max-h-[90vh] overflow-auto">
-            <div class="flex justify-between items-center mb-6 border-b border-slate-700/50 pb-4">
-              <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-xl bg-cyan-500/20 flex items-center justify-center">
-                  <EyeIcon class="w-6 h-6 text-cyan-400" />
-                </div>
-                <h2 class="text-xl font-semibold text-white">
-                  <span class="text-cyan-400">{{ activeTab.slice(0, -1) }}</span> Details
-                </h2>
+        <div v-if="showViewModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div class="bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl w-full max-w-lg p-8 shadow-2xl border border-slate-700/50 relative">
+            <!-- Close Button -->
+            <button @click="showViewModal = false"
+              class="absolute top-4 right-4 text-slate-400 hover:text-white hover:bg-slate-700/50 p-2 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <XMarkIcon class="w-5 h-5" />
+            </button>
+
+            <!-- Header -->
+            <div class="flex items-center mb-6">
+              <div class="w-10 h-10 rounded-xl bg-cyan-500/20 flex items-center justify-center mr-3">
+                <EyeIcon class="w-6 h-6 text-cyan-400" />
               </div>
-              <button @click="showViewModal = false"
-                      class="text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 p-2 rounded-lg transition-colors">
-                <XMarkIcon class="w-5 h-5" />
-              </button>
+              <div>
+                <h2 class="text-2xl font-bold text-white">Supplier Payment <span class="text-cyan-400">Details</span></h2>
+                <p class="text-xs text-slate-400">All payment and transaction info</p>
+              </div>
             </div>
 
-            <div class="space-y-5" v-if="viewingItem">
-              <template v-if="activeTab === 'assets'">
-                <div class="bg-slate-800/50 backdrop-blur-sm p-5 rounded-xl border border-slate-700/30 space-y-4">
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Name</span>
-                    <p class="text-white mt-1.5 font-medium">{{ viewingItem.name }}</p>
-                  </div>
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Type</span>
-                    <p class="text-white mt-1.5">{{ viewingItem.type }}</p>
-                  </div>
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Location</span>
-                    <p class="text-white mt-1.5">{{ viewingItem.location }}</p>
-                  </div>
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Value</span>
-                    <p class="text-white mt-1.5 font-medium">{{ formatCurrency(viewingItem.value) }}</p>
-                  </div>
+            <!-- Details Section -->
+            <div class="space-y-4">
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <div class="text-xs text-slate-400">Supplier</div>
+                  <div class="font-semibold text-white">{{ viewingItem.supplier?.name || '-' }}</div>
                 </div>
-              </template>
+                <div>
+                  <div class="text-xs text-slate-400">Product</div>
+                  <div class="font-semibold text-white">{{ viewingItem.product?.name || '-' }}</div>
+                </div>
+                <div>
+                  <div class="text-xs text-slate-400">Total Cost</div>
+                  <div class="font-bold text-indigo-300 text-lg">{{ formatCurrency(viewingItem.total_cost) }}</div>
+                </div>
+                <div>
+                  <div class="text-xs text-slate-400">Remaining Balance</div>
+                  <div class="font-bold text-rose-300 text-lg">{{ formatCurrency(viewingItem.remaining_balance) }}</div>
+                </div>
+                <div>
+                  <div class="text-xs text-slate-400">Status</div>
+                  <span
+                    class="inline-block px-3 py-1 rounded-full text-xs font-semibold"
+                    :class="{
+                      'bg-emerald-500/20 text-emerald-400': viewingItem.payment_status === 'full',
+                      'bg-amber-500/20 text-amber-400': viewingItem.payment_status === 'advance'
+                    }"
+                  >
+                    {{ viewingItem.payment_status.charAt(0).toUpperCase() + viewingItem.payment_status.slice(1) }}
+                  </span>
+                </div>
+              </div>
 
-              <template v-if="activeTab === 'investments'">
-                <div class="bg-slate-800/50 backdrop-blur-sm p-5 rounded-xl border border-slate-700/30 space-y-4">
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Investor Name</span>
-                    <p class="text-white mt-1.5 font-medium">{{ viewingItem.investor_name }}</p>
-                  </div>
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Amount</span>
-                    <p class="text-white mt-1.5 font-medium">{{ formatCurrency(viewingItem.amount) }}</p>
-                  </div>
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Investment Date</span>
-                    <p class="text-white mt-1.5">{{ formatDate(viewingItem.investment_date) }}</p>
-                  </div>
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Description</span>
-                    <p class="text-white mt-1.5">{{ viewingItem.description || 'No description provided' }}</p>
-                  </div>
-                </div>
-              </template>
+              <!-- Divider -->
+              <div class="border-t border-slate-700/50 my-4"></div>
 
-              <template v-if="activeTab === 'loans'">
-                <div class="bg-slate-800/50 backdrop-blur-sm p-5 rounded-xl border border-slate-700/30 space-y-4">
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Borrower Name</span>
-                    <p class="text-white mt-1.5 font-medium">{{ viewingItem.borrower_name }}</p>
-                  </div>
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Amount</span>
-                    <p class="text-white mt-1.5 font-medium">{{ formatCurrency(viewingItem.amount) }}</p>
-                  </div>
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Loan Date</span>
-                    <p class="text-white mt-1.5">{{ formatDate(viewingItem.loan_date) }}</p>
-                  </div>
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Due Date</span>
-                    <p class="text-white mt-1.5">{{ formatDate(viewingItem.due_date) }}</p>
-                  </div>
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Status</span>
-                    <p class="mt-1.5">
-                      <span class="px-3 py-1.5 rounded-full text-xs font-medium inline-block"
-                            :class="{
-                              'bg-amber-500/20 text-amber-400 border border-amber-500/20': viewingItem.status === 'pending',
-                              'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20': viewingItem.status === 'paid',
-                              'bg-rose-500/20 text-rose-400 border border-rose-500/20': viewingItem.status === 'overdue'
-                            }">
-                        {{ viewingItem.status.charAt(0).toUpperCase() + viewingItem.status.slice(1) }}
-                      </span>
-                    </p>
-                  </div>
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Description</span>
-                    <p class="text-white mt-1.5">{{ viewingItem.description || 'No description provided' }}</p>
-                  </div>
+              <!-- Transactions Table -->
+              <div>
+                <div class="text-sm font-semibold text-cyan-400 mb-2">Transactions</div>
+                <div class="overflow-x-auto">
+                  <table class="min-w-full text-sm rounded-xl overflow-hidden">
+                    <thead>
+                      <tr class="bg-slate-800 text-slate-400">
+                        <th class="py-2 px-3 text-left">Amount Paid</th>
+                        <th class="py-2 px-3 text-left">Method</th>
+                        <th class="py-2 px-3 text-left">Check #</th>
+                        <th class="py-2 px-3 text-left">Bank</th>
+                        <th class="py-2 px-3 text-left">Paid At</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="tx in viewingItem.transactions" :key="tx.id" class="odd:bg-slate-800 even:bg-slate-900">
+                        <td class="py-2 px-3 font-medium text-white">{{ formatCurrency(tx.amount_paid) }}</td>
+                        <td class="py-2 px-3 text-white">{{ tx.payment_method }}</td>
+                        <td class="py-2 px-3 text-white">{{ tx.check_number || '-' }}</td>
+                        <td class="py-2 px-3 text-white">{{ tx.bank_name || '-' }}</td>
+                        <td class="py-2 px-3 text-white">{{ formatDate(tx.paid_at) }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
-              </template>
-
-              <template v-if="activeTab === 'dailyExpenses'">
-                <div class="bg-slate-800/50 backdrop-blur-sm p-5 rounded-xl border border-slate-700/30 space-y-4">
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Category</span>
-                    <p class="text-white mt-1.5 font-medium">{{ viewingItem.category }}</p>
-                  </div>
-                  <div v-if="viewingItem.custom_category">
-                    <span class="text-sm font-medium text-cyan-400">Custom Category</span>
-                    <p class="text-white mt-1.5">{{ viewingItem.custom_category }}</p>
-                  </div>
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Description</span>
-                    <p class="text-white mt-1.5">{{ viewingItem.description || 'No description provided' }}</p>
-                  </div>
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Amount</span>
-                    <p class="text-white mt-1.5 font-medium">{{ formatCurrency(viewingItem.amount) }}</p>
-                  </div>
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Date</span>
-                    <p class="text-white mt-1.5">{{ formatDate(viewingItem.date) }}</p>
-                  </div>
-                </div>
-              </template>
-
-              <template v-if="activeTab === 'supplierPayments'">
-                <div class="bg-slate-800/50 backdrop-blur-sm p-5 rounded-xl border border-slate-700/30 space-y-4">
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Supplier</span>
-                    <p class="text-white mt-1.5 font-medium">{{ viewingItem.supplier?.name || '-' }}</p>
-                  </div>
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Product</span>
-                    <p class="text-white mt-1.5">{{ viewingItem.product?.name || '-' }}</p>
-                  </div>
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Total Cost</span>
-                    <p class="text-white mt-1.5 font-medium">{{ formatCurrency(viewingItem.total_cost) }}</p>
-                  </div>
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Remaining Balance</span>
-                    <p class="text-white mt-1.5 font-medium">{{ formatCurrency(viewingItem.remaining_balance) }}</p>
-                  </div>
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Status</span>
-                    <p class="mt-1.5">
-                      <span class="px-3 py-1.5 rounded-full text-xs font-medium inline-block"
-                            :class="{
-                              'bg-amber-500/20 text-amber-400 border border-amber-500/20': viewingItem.payment_status === 'advance',
-                              'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20': viewingItem.payment_status === 'full'
-                            }">
-                        {{ viewingItem.payment_status.charAt(0).toUpperCase() + viewingItem.payment_status.slice(1) }}
-                      </span>
-                    </p>
-                  </div>
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Transactions</span>
-                    <table class="w-full mt-2 text-sm">
-                      <thead>
-                        <tr>
-                          <th class="text-left text-slate-400 font-semibold py-1">Amount Paid</th>
-                          <th class="text-left text-slate-400 font-semibold py-1">Method</th>
-                          <th class="text-left text-slate-400 font-semibold py-1">Check #</th>
-                          <th class="text-left text-slate-400 font-semibold py-1">Bank</th>
-                          <th class="text-left text-slate-400 font-semibold py-1">Paid At</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr v-for="tx in viewingItem.transactions" :key="tx.id">
-                          <td class="py-1 text-white">{{ formatCurrency(tx.amount_paid) }}</td>
-                          <td class="py-1 text-white">{{ tx.payment_method }}</td>
-                          <td class="py-1 text-white">{{ tx.check_number || '-' }}</td>
-                          <td class="py-1 text-white">{{ tx.bank_name || '-' }}</td>
-                          <td class="py-1 text-white">{{ formatDate(tx.paid_at) }}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </template>
+              </div>
             </div>
 
-            <div class="flex justify-end mt-6 pt-4 border-t border-slate-700/50">
+            <!-- Footer -->
+            <div class="flex justify-end mt-8">
               <button @click="showViewModal = false"
-                      class="px-5 py-2.5 bg-slate-700 text-white rounded-xl hover:bg-slate-600 transition-all shadow-lg flex items-center">
+                class="px-5 py-2.5 bg-slate-700 text-white rounded-xl hover:bg-slate-600 transition-all shadow-lg flex items-center">
                 <XMarkIcon class="w-5 h-5 mr-2" />
                 Close
               </button>
