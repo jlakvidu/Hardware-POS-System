@@ -770,7 +770,7 @@ const deleteItem = async (item) => {
   try {
     const result = await Swal.fire({
       title: `Delete ${activeTab.value.slice(0, -1)}?`,
-      text: `Are you sure you want to delete ${item.name || item.investor_name || item.borrower_name || item.category || item.employee_name}? This action cannot be undone.`,
+      text: `Are you sure you want to delete ${item.name || item.investor_name || item.borrower_name || item.category || item.employee_name || 'this'}? This action cannot be undone.`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#EF4444',
@@ -803,7 +803,7 @@ const deleteItem = async (item) => {
 
       Swal.fire({
         title: 'Deleted!',
-        text: `${item.name || item.investor_name || item.borrower_name || item.category || item.employee_name} has been deleted.`,
+        text: `${item.name || item.investor_name || item.borrower_name || item.category || item.employee_name || 'Selected data'} has been deleted.`,
         icon: 'success',
         confirmButtonColor: '#3B82F6',
         background: '#1e293b',
@@ -1645,10 +1645,10 @@ const showSidebar = () => { isSidebarVisible.value = true }
 
               <template v-else-if="activeTab === 'employerPayments'">
                 <div class="mb-5">
-                  <label class="block text-sm font-medium text-slate-300 mb-1.5">Select Cashier</label>
+                  <label class="block text-sm font-medium text-slate-300 mb-1.5">Select Employer</label>
                   <select v-model="formData.cashier_id" required
                           class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all">
-                    <option value="">Select a cashier</option>
+                    <option value="">Select a Employer</option>
                     <option v-for="cashier in cashiers" :key="cashier.id" :value="cashier.id">
                       {{ cashier.name }}
                     </option>
