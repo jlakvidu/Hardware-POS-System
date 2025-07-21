@@ -45,6 +45,8 @@ const showViewModal = ref(false)
 const viewingItem = ref(null)
 const showEmployerPaymentReceipt = ref(false)
 const employerPaymentReceiptData = ref(null)
+const employerPaymentSearchType = ref('name')
+const employerPaymentSearchValue = ref('')
 
 // Data storage
 const assets = ref([])
@@ -200,7 +202,26 @@ const filteredItems = computed(() => {
       break
     case 'employerPayments':
       items = employerPayments.value
-      break
+      // Advanced search for employer payments
+      if (!employerPaymentSearchValue.value) return items
+      if (employerPaymentSearchType.value === 'name') {
+        return items.filter(item =>
+          item.cashier?.name?.toLowerCase().includes(employerPaymentSearchValue.value.toLowerCase())
+        )
+      } else if (employerPaymentSearchType.value === 'payment_method') {
+        return items.filter(item =>
+          item.payment_method === employerPaymentSearchValue.value
+        )
+      } else if (employerPaymentSearchType.value === 'payment_date') {
+        return items.filter(item =>
+          item.payment_date === employerPaymentSearchValue.value
+        )
+      } else if (employerPaymentSearchType.value === 'payment_duration') {
+        return items.filter(item =>
+          item.payment_duration === employerPaymentSearchValue.value
+        )
+      }
+      return items
   }
   
   if (!searchQuery.value) return items
@@ -934,13 +955,58 @@ const showSidebar = () => { isSidebarVisible.value = true }
         </div>
 
         <div class="px-6 py-4 border-b border-slate-700/50 bg-slate-800/30">
-          <div class="relative">
+          <div v-if="activeTab !== 'employerPayments'" class="relative">
             <input v-model="searchQuery"
                    type="text" 
                    placeholder="Search..." 
                    class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl pl-11 pr-4 py-2.5 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all" />
             <div class="absolute left-3.5 top-3 text-slate-500">
               <MagnifyingGlassIcon class="w-5 h-5" />
+            </div>
+          </div>
+          <div v-else class="flex flex-col md:flex-row gap-3 items-center">
+            <div class="flex gap-2 items-center">
+              <label class="text-xs text-slate-400 font-medium mr-2">Search By:</label>
+              <select v-model="employerPaymentSearchType"
+                      class="bg-slate-800/80 border border-slate-600/50 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 text-xs">
+                <option value="name">Employer Name</option>
+                <option value="payment_method">Payment Method</option>
+                <option value="payment_date">Payment Date</option>
+                <option value="payment_duration">Payment Duration</option>
+              </select>
+            </div>
+            <div v-if="employerPaymentSearchType === 'name'" class="relative flex-1">
+              <input v-model="employerPaymentSearchValue"
+                     type="text"
+                     placeholder="Search by employer name..."
+                     class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl pl-11 pr-4 py-2.5 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all" />
+              <div class="absolute left-3.5 top-3 text-slate-500">
+                <MagnifyingGlassIcon class="w-5 h-5" />
+              </div>
+            </div>
+            <div v-else-if="employerPaymentSearchType === 'payment_method'" class="flex-1">
+              <select v-model="employerPaymentSearchValue"
+                      class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all">
+                <option value="">Select Payment Method</option>
+                <option value="cash">Cash</option>
+                <option value="bank_transfer">Bank Transfer</option>
+                <option value="check">Check</option>
+              </select>
+            </div>
+            <div v-else-if="employerPaymentSearchType === 'payment_date'" class="flex-1">
+              <input v-model="employerPaymentSearchValue"
+                     type="date"
+                     class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all" />
+            </div>
+            <div v-else-if="employerPaymentSearchType === 'payment_duration'" class="flex-1">
+              <select v-model="employerPaymentSearchValue"
+                      class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all">
+                <option value="">Select Duration</option>
+                <option value="Daily">Daily</option>
+                <option value="Weekly">Weekly</option>
+                <option value="Monthly">Monthly</option>
+                <option value="Other">Other</option>
+              </select>
             </div>
           </div>
         </div>
