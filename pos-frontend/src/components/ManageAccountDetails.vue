@@ -1284,6 +1284,7 @@ const showSidebar = () => { isSidebarVisible.value = true }
                 <tr class="text-left border-b border-slate-700/50 bg-slate-800/30">
                   <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Cashier Name</th>
                   <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Salary Amount</th>
+                  <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Payment Duration</th> <!-- new column -->
                   <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Payment Date</th>
                   <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Payment Method</th>
                   <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Notes</th>
@@ -1294,8 +1295,50 @@ const showSidebar = () => { isSidebarVisible.value = true }
                 <tr v-for="item in sortedItems" :key="item.id" class="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors">
                   <td class="px-6 py-4 text-white font-medium">{{ item.cashier?.name || '-' }}</td>
                   <td class="px-6 py-4 text-slate-300 font-medium">{{ formatCurrency(item.salary_amount) }}</td>
+                  <td class="px-6 py-4 text-slate-300">
+                    <span
+                      class="px-3 py-1.5 rounded-full text-xs font-medium inline-block"
+                      :class="{
+                        'bg-blue-500/20 text-blue-400 border border-blue-500/30': item.payment_duration === 'Daily',
+                        'bg-purple-500/20 text-purple-400 border border-purple-500/30': item.payment_duration === 'Weekly',
+                        'bg-pink-500/20 text-pink-400 border border-pink-500/30': item.payment_duration === 'Monthly',
+                        'bg-gray-500/20 text-gray-300 border border-gray-500/30': item.payment_duration === 'Other'
+                      }"
+                    >
+                      {{
+                        item.payment_duration === 'Daily'
+                          ? 'Daily'
+                          : item.payment_duration === 'Weekly'
+                          ? 'Weekly'
+                          : item.payment_duration === 'Monthly'
+                          ? 'Monthly'
+                          : item.payment_duration === 'Other'
+                          ? 'Other'
+                          : item.payment_duration
+                      }}
+                    </span>
+                  </td>
                   <td class="px-6 py-4 text-slate-300">{{ formatDate(item.payment_date) }}</td>
-                  <td class="px-6 py-4 text-slate-300">{{ item.payment_method }}</td>
+                  <td class="px-6 py-4 text-slate-300">
+                    <span
+                      class="px-3 py-1.5 rounded-full text-xs font-medium inline-block"
+                      :class="{
+                        'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30': item.payment_method === 'bank_transfer',
+                        'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30': item.payment_method === 'cash',
+                        'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30': item.payment_method === 'check'
+                      }"
+                    >
+                      {{
+                        item.payment_method === 'bank_transfer'
+                          ? 'Bank Transfer'
+                          : item.payment_method === 'cash'
+                          ? 'Cash'
+                          : item.payment_method === 'check'
+                          ? 'Check'
+                          : item.payment_method
+                      }}
+                    </span>
+                  </td>
                   <td class="px-6 py-4 text-slate-300">{{ item.notes || '-' }}</td>
                   <td class="px-6 py-4">
                     <div class="flex justify-end space-x-2">
@@ -1568,7 +1611,9 @@ const showSidebar = () => { isSidebarVisible.value = true }
                   <EyeIcon class="w-6 h-6 text-cyan-400" />
                 </div>
                 <h2 class="text-xl font-semibold text-white">
-                  <span class="text-cyan-400">{{ activeTab.slice(0, -1) }}</span> Details
+                  <span class="text-cyan-400">
+                    {{ activeTab === 'employerPayments' ? 'Employer Payment Details' : activeTab.slice(0, -1) + ' Details' }}
+                  </span>
                 </h2>
               </div>
               <button @click="showViewModal = false"
