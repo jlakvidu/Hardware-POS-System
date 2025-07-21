@@ -49,6 +49,8 @@ const investments = ref([])
 const loans = ref([])
 const dailyExpenses = ref([])
 const supplierPayments = ref([])
+const employerPayments = ref([])
+const cashiers = ref([])
 
 // Form data
 const formData = ref({
@@ -74,6 +76,14 @@ const formData = ref({
   category: '',
   custom_category: '',
   date: new Date().toISOString().split('T')[0], // Default to today
+
+  // Employer Payment fields
+  cashier_id: '',
+  salary_amount: '',
+  payment_duration: '', // <-- add this
+  payment_date: new Date().toISOString().split('T')[0],
+  payment_method: 'cash',
+  notes: ''
 })
 
 // Add validation state for asset fields
@@ -148,6 +158,23 @@ const validateDailyExpensesTextField = (field, value) => {
   }
 }
 
+// Add validation state for employer payments
+const employerPaymentFieldErrors = ref({
+  notes: ''
+})
+
+// Validation function for employer payments
+const validateEmployerPaymentTextField = (field, value) => {
+  const regex = /^[A-Za-z\s]+$/
+  if (!value.trim()) {
+    employerPaymentFieldErrors.value[field] = ''
+  } else if (!regex.test(value.trim())) {
+    employerPaymentFieldErrors.value[field] = 'Only letters and spaces are allowed'
+  } else {
+    employerPaymentFieldErrors.value[field] = ''
+  }
+}
+
 // Computed properties
 const filteredItems = computed(() => {
   let items = []
@@ -167,6 +194,9 @@ const filteredItems = computed(() => {
       break
     case 'supplierPayments':
       items = supplierPayments.value
+      break
+    case 'employerPayments':
+      items = employerPayments.value
       break
   }
   
@@ -192,6 +222,9 @@ const filteredItems = computed(() => {
       return item.supplier?.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
              item.product?.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
              item.payment_status.toLowerCase().includes(searchQuery.value.toLowerCase())
+    } else if (activeTab.value === 'employerPayments') {
+      return item.employee_name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+             item.notes?.toLowerCase().includes(searchQuery.value.toLowerCase())
     }
     return false
   })
@@ -227,6 +260,10 @@ const totalValue = computed(() => {
     return dailyExpenses.value.reduce((sum, expense) => sum + parseFloat(expense.amount || 0), 0)
   } else if (activeTab.value === 'supplierPayments') {
     return supplierPayments.value.reduce((sum, group) => sum + parseFloat(group.total_cost || 0), 0)
+  } else if (activeTab.value === 'employerPayments') {
+    return Array.isArray(employerPayments.value) 
+      ? employerPayments.value.reduce((sum, payment) => sum + parseFloat(payment.salary_amount || 0), 0)
+      : 0
   }
   return 0
 })
@@ -235,6 +272,7 @@ const formTitle = computed(() => {
   const action = formMode.value === 'add' ? 'Add' : 'Edit'
   const type = activeTab.value.charAt(0).toUpperCase() + activeTab.value.slice(1, -1)
   if (activeTab.value === 'supplierPayments') return 'Supplier Payment'
+  if (activeTab.value === 'employerPayments') return 'Employer Payment'
   return `${action} ${type}`
 })
 
@@ -304,6 +342,21 @@ const isValidDailyExpensesForm = computed(() => {
   )
 })
 
+// Update isValidEmployerPaymentForm
+const isValidEmployerPaymentForm = computed(() => {
+  if (activeTab.value !== 'employerPayments') return false
+  validateEmployerPaymentTextField('notes', formData.value.notes || '')
+  return (
+    !employerPaymentFieldErrors.value.notes &&
+    formData.value.cashier_id &&
+    formData.value.salary_amount &&
+    Number(formData.value.salary_amount) > 0 &&
+    formData.value.payment_duration && // <-- add this
+    formData.value.payment_date &&
+    formData.value.payment_method 
+  )
+})
+
 const isFormValid = computed(() => {
   switch (activeTab.value) {
     case 'assets':
@@ -316,6 +369,8 @@ const isFormValid = computed(() => {
       return isValidDailyExpensesForm.value
     case 'supplierPayments':
       return false // No form for supplier payments
+    case 'employerPayments':
+      return isValidEmployerPaymentForm.value
     default:
       return false
   }
@@ -328,16 +383,20 @@ const fetchData = async () => {
   isLoading.value = true
   try {
     // Fetch main data first (without supplier payments)
-    const [assetsRes, investmentsRes, loansRes, expensesRes] = await Promise.all([
+    const [assetsRes, investmentsRes, loansRes, expensesRes, employerPaymentsRes, cashiersRes] = await Promise.all([
       connection.get('/assets'),
       connection.get('/investments'),
       connection.get('/loans'),
-      connection.get('/api/daily-expenses')
+      connection.get('/api/daily-expenses'),
+      connection.get('/employer-payments'),
+      connection.get('/cashiers') // Updated endpoint
     ])
     assets.value = assetsRes.data
     investments.value = investmentsRes.data
     loans.value = updateOverdueLoans(loansRes.data)
     dailyExpenses.value = expensesRes.data
+    employerPayments.value = employerPaymentsRes.data?.data || []
+    cashiers.value = cashiersRes.data?.data || [] // Updated to access data property
 
     // Fetch supplier payments in parallel, but don't block UI
     connection.get('/supplier-payments?fields=id,supplier_id,product_id,total_cost,remaining_balance,payment_status')
@@ -415,6 +474,15 @@ const openEditForm = (item) => {
       amount: item.amount,
       date: item.date
     }
+  } else if (activeTab.value === 'employerPayments') {
+    formData.value = {
+      cashier_id: item.cashier_id || '',
+      salary_amount: item.salary_amount || '',
+      payment_duration: item.payment_duration || '', // <-- add this
+      payment_date: item.payment_date || new Date().toISOString().split('T')[0],
+      payment_method: item.payment_method || 'cash',
+      notes: item.notes || ''
+    }
   }
   
   showForm.value = true
@@ -441,7 +509,13 @@ const resetForm = () => {
     description: '',
     category: '',
     custom_category: '',
-    date: new Date().toISOString().split('T')[0]
+    date: new Date().toISOString().split('T')[0],
+    cashier_id: '',
+    salary_amount: '',
+    payment_duration: '', // <-- add this
+    payment_date: new Date().toISOString().split('T')[0],
+    payment_method: 'cash',
+    notes: ''
   }
   currentItem.value = null
 }
@@ -451,33 +525,72 @@ const handleSubmit = async () => {
 
   isSubmitting.value = true
   try {
+    if (activeTab.value === 'employerPayments') {
+      if (!isValidEmployerPaymentForm.value) {
+        throw new Error('Please fill in all required employer payment fields correctly')
+      }
+
+      const paymentPayload = {
+        cashier_id: formData.value.cashier_id,
+        salary_amount: Number(formData.value.salary_amount),
+        payment_duration: formData.value.payment_duration,
+        payment_date: formData.value.payment_date,
+        payment_method: formData.value.payment_method,
+        notes: formData.value.notes || ''
+      }
+
+      if (formMode.value === 'add') {
+        const response = await connection.post('/employer-payments', paymentPayload);
+        if (response.data) {
+          const newPayment = response.data.data;
+          employerPayments.value.push(newPayment);
+          await Swal.fire({
+            icon: 'success',
+            title: 'Success!',
+            text: 'Employer payment added successfully',
+            background: '#1e293b',
+            color: '#ffffff'
+          });
+          closeForm();
+          return;
+        }
+      } else {
+        const response = await connection.put(`/employer-payments/${currentItem.value.id}`, paymentPayload);
+        if (response.data) {
+          const updatedPayment = response.data.data;
+          const idx = employerPayments.value.findIndex(p => p.id === currentItem.value.id);
+          if (idx !== -1) employerPayments.value[idx] = updatedPayment;
+          await Swal.fire({
+            icon: 'success',
+            title: 'Success!',
+            text: 'Employer payment updated successfully',
+            background: '#1e293b',
+            color: '#ffffff'
+          });
+          closeForm();
+          return;
+        }
+      }
+    }
+
     if (formMode.value === 'add') {
-      let response
       if (activeTab.value === 'assets') {
         if (!isValidAssetForm.value) {
-          throw new Error('Please fill in all required asset fields correctly')
-        }
-        response = await connection.post('/assets', formData.value)
-        assets.value.push(response.data)
-      } else if (activeTab.value === 'investments') {
-        if (!isValidInvestmentForm.value) {
-          throw new Error('Please fill in all required investment fields correctly')
-        }
-        response = await connection.post('/investments', formData.value)
         investments.value.push(response.data)
       } else if (activeTab.value === 'loans') {
         if (!isValidLoanForm.value) {
           throw new Error('Please fill in all required loan fields correctly')
         }
-        response = await connection.post('/loans', formData.value)
+        const response = await connection.post('/loans', formData.value)
         loans.value.push(response.data)
       } else if (activeTab.value === 'dailyExpenses') {
         if (!isValidDailyExpensesForm.value) {
           throw new Error('Please fill in all required daily expenses fields correctly')
         }
-        response = await connection.post('/api/daily-expenses', formData.value) // Fixed endpoint
+        const response = await connection.post('/api/daily-expenses', formData.value) // Fixed endpoint
         dailyExpenses.value.push(response.data)
       }
+      
       Swal.fire({
         icon: 'success',
         title: 'Success!',
@@ -485,6 +598,45 @@ const handleSubmit = async () => {
         background: '#1e293b',
         color: '#ffffff'
       })
+    } else {
+      if (activeTab.value === 'assets') {
+        if (!isValidAssetForm.value) {
+          throw new Error('Please fill in all required asset fields correctly')
+        }
+        const response = await connection.put(`/assets/${currentItem.value.id}`, formData.value)
+        const index = assets.value.findIndex(item => item.id === currentItem.value.id)
+        if (index !== -1) assets.value[index] = response.data
+      } else if (activeTab.value === 'investments') {
+        if (!isValidInvestmentForm.value) {
+          throw new Error('Please fill in all required investment fields correctly')
+        }
+        const response = await connection.put(`/investments/${currentItem.value.id}`, formData.value)
+        const index = investments.value.findIndex(item => item.id === currentItem.value.id)
+        if (index !== -1) investments.value[index] = response.data
+      } else if (activeTab.value === 'loans') {
+        if (!isValidLoanForm.value) {
+          throw new Error('Please fill in all required loan fields correctly')
+        }
+        const response = await connection.put(`/loans/${currentItem.value.id}`, formData.value)
+        const index = loans.value.findIndex(item => item.id === currentItem.value.id)
+        if (index !== -1) loans.value[index] = response.data
+      } else if (activeTab.value === 'dailyExpenses') {
+        if (!isValidDailyExpensesForm.value) {
+          throw new Error('Please fill in all required daily expenses fields correctly')
+        }
+        const response = await connection.put(`/api/daily-expenses/${currentItem.value.id}`, formData.value) // Fixed endpoint
+        const index = dailyExpenses.value.findIndex(item => item.id === currentItem.value.id)
+        if (index !== -1) dailyExpenses.value[index] = response.data
+      }
+      
+      Swal.fire({
+        icon: 'success',
+        title: 'Success!',
+        text: `${activeTab.value.slice(0, -1)} updated successfully`,
+        background: '#1e293b',
+        color: '#ffffff'
+      })
+    }
     } else {
       let response
       if (activeTab.value === 'assets') {
@@ -525,6 +677,7 @@ const handleSubmit = async () => {
       })
     }
     closeForm()
+    
   } catch (error) {
     console.error('Error submitting form:', error)
     Swal.fire({
@@ -543,7 +696,7 @@ const deleteItem = async (item) => {
   try {
     const result = await Swal.fire({
       title: `Delete ${activeTab.value.slice(0, -1)}?`,
-      text: `Are you sure you want to delete ${item.name || item.investor_name || item.borrower_name || item.category}? This action cannot be undone.`,
+      text: `Are you sure you want to delete ${item.name || item.investor_name || item.borrower_name || item.category || item.employee_name}? This action cannot be undone.`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#EF4444',
@@ -569,11 +722,14 @@ const deleteItem = async (item) => {
       } else if (activeTab.value === 'supplierPayments') {
         await connection.delete(`/supplier-payments/${item.id}`);
         supplierPayments.value = supplierPayments.value.filter(payment => payment.id !== item.id);
+      } else if (activeTab.value === 'employerPayments') {
+        await connection.delete(`/employer-payments/${item.id}`);
+        employerPayments.value = employerPayments.value.filter(payment => payment.id !== item.id);
       }
 
       Swal.fire({
         title: 'Deleted!',
-        text: `${item.name || item.investor_name || item.borrower_name || item.category} has been deleted.`,
+        text: `${item.name || item.investor_name || item.borrower_name || item.category || item.employee_name} has been deleted.`,
         icon: 'success',
         confirmButtonColor: '#3B82F6',
         background: '#1e293b',
@@ -643,6 +799,8 @@ const getActiveItems = () => {
       return dailyExpenses.value
     case 'supplierPayments':
       return supplierPayments.value
+    case 'employerPayments':
+      return employerPayments.value
     default:
       return []
   }
@@ -771,6 +929,12 @@ const showSidebar = () => { isSidebarVisible.value = true }
                   :class="activeTab === 'supplierPayments' ? 'bg-indigo-500/20 text-indigo-300 shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-700/30'">
             <BanknotesIcon class="w-5 h-5 mr-2" />
             <span class="font-medium">Supplier Payments</span>
+          </button>
+          <button @click="setActiveTab('employerPayments')" 
+                  class="px-4 py-2.5 rounded-lg flex items-center transition-all duration-200"
+                  :class="activeTab === 'employerPayments' ? 'bg-indigo-500/20 text-indigo-300 shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-700/30'">
+            <BanknotesIcon class="w-5 h-5 mr-2" />
+            <span class="font-medium">Employer Payments</span>
           </button>
         </div>
 
@@ -1113,6 +1277,43 @@ const showSidebar = () => { isSidebarVisible.value = true }
               </tbody>
             </table>
           </div>
+
+          <div v-else-if="activeTab === 'employerPayments'" class="w-full">
+            <table class="w-full border-collapse">
+              <thead>
+                <tr class="text-left border-b border-slate-700/50 bg-slate-800/30">
+                  <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Cashier Name</th>
+                  <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Salary Amount</th>
+                  <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Payment Date</th>
+                  <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Payment Method</th>
+                  <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Notes</th>
+                  <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="item in sortedItems" :key="item.id" class="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors">
+                  <td class="px-6 py-4 text-white font-medium">{{ item.cashier?.name || '-' }}</td>
+                  <td class="px-6 py-4 text-slate-300 font-medium">{{ formatCurrency(item.salary_amount) }}</td>
+                  <td class="px-6 py-4 text-slate-300">{{ formatDate(item.payment_date) }}</td>
+                  <td class="px-6 py-4 text-slate-300">{{ item.payment_method }}</td>
+                  <td class="px-6 py-4 text-slate-300">{{ item.notes || '-' }}</td>
+                  <td class="px-6 py-4">
+                    <div class="flex justify-end space-x-2">
+                      <button @click="viewDetails(item)" class="text-cyan-400 hover:text-cyan-300 p-1.5 hover:bg-slate-700/50 rounded-lg transition-colors">
+                        <EyeIcon class="w-5 h-5" />
+                      </button>
+                      <button @click="openEditForm(item)" class="text-indigo-400 hover:text-indigo-300 p-1.5 hover:bg-slate-700/50 rounded-lg transition-colors">
+                        <PencilIcon class="w-5 h-5" />
+                      </button>
+                      <button @click="deleteItem(item)" class="text-rose-400 hover:text-rose-300 p-1.5 hover:bg-slate-700/50 rounded-lg transition-colors">
+                        <TrashIcon class="w-5 h-5" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div v-if="showForm" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm">
@@ -1280,6 +1481,56 @@ const showSidebar = () => { isSidebarVisible.value = true }
                 </div>
               </template>
 
+              <template v-else-if="activeTab === 'employerPayments'">
+                <div class="mb-5">
+                  <label class="block text-sm font-medium text-slate-300 mb-1.5">Select Cashier</label>
+                  <select v-model="formData.cashier_id" required
+                          class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all">
+                    <option value="">Select a cashier</option>
+                    <option v-for="cashier in cashiers" :key="cashier.id" :value="cashier.id">
+                      {{ cashier.name }}
+                    </option>
+                  </select>
+                </div>
+                <div class="mb-5">
+                  <label class="block text-sm font-medium text-slate-300 mb-1.5">Salary Amount</label>
+                  <input v-model="formData.salary_amount" type="number" min="0" step="0.01" required
+                         class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all" />
+                </div>
+                <div class="mb-5">
+                  <label class="block text-sm font-medium text-slate-300 mb-1.5">Payment Duration</label>
+                  <select v-model="formData.payment_duration" required
+                          class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all">
+                    <option value="">Select Duration</option>
+                    <option value="Daily">Daily</option>
+                    <option value="Weekly">Weekly</option>
+                    <option value="Monthly">Monthly</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div class="mb-5">
+                  <label class="block text-sm font-medium text-slate-300 mb-1.5">Payment Date</label>
+                  <input v-model="formData.payment_date" type="date" required
+                         class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all" />
+                </div>
+                <div class="mb-5">
+                  <label class="block text-sm font-medium text-slate-300 mb-1.5">Payment Method</label>
+                  <select v-model="formData.payment_method" required
+                          class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all">
+                    <option value="cash">Cash</option>
+                    <option value="bank_transfer">Bank Transfer</option>
+                    <option value="check">Check</option>
+                  </select>
+                </div>
+                <div class="mb-5">
+                  <label class="block text-sm font-medium text-slate-300 mb-1.5">Notes</label>
+                  <textarea v-model="formData.notes" rows="3"
+                            @input="validateEmployerPaymentTextField('notes', formData.notes)"
+                            class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all"></textarea>
+                  <div v-if="employerPaymentFieldErrors.notes" class="text-rose-400 text-xs mt-1">{{ employerPaymentFieldErrors.notes }}</div>
+                </div>
+              </template>
+
               <div class="flex justify-end space-x-3 mt-6">
                 <button type="button" @click="closeForm"
                         class="px-4 py-2.5 rounded-xl border border-slate-600/50 text-slate-300 hover:text-white hover:bg-slate-700 transition-all">
@@ -1309,93 +1560,218 @@ const showSidebar = () => { isSidebarVisible.value = true }
           </div>
         </div>
 
-        <div v-if="showViewModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div class="bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl w-full max-w-lg p-8 shadow-2xl border border-slate-700/50 relative">
-            <!-- Close Button -->
-            <button @click="showViewModal = false"
-              class="absolute top-4 right-4 text-slate-400 hover:text-white hover:bg-slate-700/50 p-2 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500">
-              <XMarkIcon class="w-5 h-5" />
-            </button>
-
-            <!-- Header -->
-            <div class="flex items-center mb-6">
-              <div class="w-10 h-10 rounded-xl bg-cyan-500/20 flex items-center justify-center mr-3">
-                <EyeIcon class="w-6 h-6 text-cyan-400" />
+        <div v-if="showViewModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div class="bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl w-full max-w-xl p-6 shadow-2xl border border-slate-700/50 max-h-[90vh] overflow-auto">
+            <div class="flex justify-between items-center mb-6 border-b border-slate-700/50 pb-4">
+              <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-cyan-500/20 flex items-center justify-center">
+                  <EyeIcon class="w-6 h-6 text-cyan-400" />
+                </div>
+                <h2 class="text-xl font-semibold text-white">
+                  <span class="text-cyan-400">{{ activeTab.slice(0, -1) }}</span> Details
+                </h2>
               </div>
-              <div>
-                <h2 class="text-2xl font-bold text-white">Supplier Payment <span class="text-cyan-400">Details</span></h2>
-                <p class="text-xs text-slate-400">All payment and transaction info</p>
-              </div>
-            </div>
-
-            <!-- Details Section -->
-            <div class="space-y-4">
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <div class="text-xs text-slate-400">Supplier</div>
-                  <div class="font-semibold text-white">{{ viewingItem.supplier?.name || '-' }}</div>
-                </div>
-                <div>
-                  <div class="text-xs text-slate-400">Product</div>
-                  <div class="font-semibold text-white">{{ viewingItem.product?.name || '-' }}</div>
-                </div>
-                <div>
-                  <div class="text-xs text-slate-400">Total Cost</div>
-                  <div class="font-bold text-indigo-300 text-lg">{{ formatCurrency(viewingItem.total_cost) }}</div>
-                </div>
-                <div>
-                  <div class="text-xs text-slate-400">Remaining Balance</div>
-                  <div class="font-bold text-rose-300 text-lg">{{ formatCurrency(viewingItem.remaining_balance) }}</div>
-                </div>
-                <div>
-                  <div class="text-xs text-slate-400">Status</div>
-                  <span
-                    class="inline-block px-3 py-1 rounded-full text-xs font-semibold"
-                    :class="{
-                      'bg-emerald-500/20 text-emerald-400': viewingItem.payment_status === 'full',
-                      'bg-amber-500/20 text-amber-400': viewingItem.payment_status === 'advance'
-                    }"
-                  >
-                    {{ viewingItem.payment_status.charAt(0).toUpperCase() + viewingItem.payment_status.slice(1) }}
-                  </span>
-                </div>
-              </div>
-
-              <!-- Divider -->
-              <div class="border-t border-slate-700/50 my-4"></div>
-
-              <!-- Transactions Table -->
-              <div>
-                <div class="text-sm font-semibold text-cyan-400 mb-2">Transactions</div>
-                <div class="overflow-x-auto">
-                  <table class="min-w-full text-sm rounded-xl overflow-hidden">
-                    <thead>
-                      <tr class="bg-slate-800 text-slate-400">
-                        <th class="py-2 px-3 text-left">Amount Paid</th>
-                        <th class="py-2 px-3 text-left">Method</th>
-                        <th class="py-2 px-3 text-left">Check #</th>
-                        <th class="py-2 px-3 text-left">Bank</th>
-                        <th class="py-2 px-3 text-left">Paid At</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="tx in viewingItem.transactions" :key="tx.id" class="odd:bg-slate-800 even:bg-slate-900">
-                        <td class="py-2 px-3 font-medium text-white">{{ formatCurrency(tx.amount_paid) }}</td>
-                        <td class="py-2 px-3 text-white">{{ tx.payment_method }}</td>
-                        <td class="py-2 px-3 text-white">{{ tx.check_number || '-' }}</td>
-                        <td class="py-2 px-3 text-white">{{ tx.bank_name || '-' }}</td>
-                        <td class="py-2 px-3 text-white">{{ formatDate(tx.paid_at) }}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            <!-- Footer -->
-            <div class="flex justify-end mt-8">
               <button @click="showViewModal = false"
-                class="px-5 py-2.5 bg-slate-700 text-white rounded-xl hover:bg-slate-600 transition-all shadow-lg flex items-center">
+                      class="text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 p-2 rounded-lg transition-colors">
+                <XMarkIcon class="w-5 h-5" />
+              </button>
+            </div>
+
+            <div class="space-y-5" v-if="viewingItem">
+              <template v-if="activeTab === 'assets'">
+                <div class="bg-slate-800/50 backdrop-blur-sm p-5 rounded-xl border border-slate-700/30 space-y-4">
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Name</span>
+                    <p class="text-white mt-1.5 font-medium">{{ viewingItem.name }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Type</span>
+                    <p class="text-white mt-1.5">{{ viewingItem.type }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Location</span>
+                    <p class="text-white mt-1.5">{{ viewingItem.location }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Value</span>
+                    <p class="text-white mt-1.5 font-medium">{{ formatCurrency(viewingItem.value) }}</p>
+                  </div>
+                </div>
+              </template>
+
+              <template v-if="activeTab === 'investments'">
+                <div class="bg-slate-800/50 backdrop-blur-sm p-5 rounded-xl border border-slate-700/30 space-y-4">
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Investor Name</span>
+                    <p class="text-white mt-1.5 font-medium">{{ viewingItem.investor_name }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Amount</span>
+                    <p class="text-white mt-1.5 font-medium">{{ formatCurrency(viewingItem.amount) }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Investment Date</span>
+                    <p class="text-white mt-1.5">{{ formatDate(viewingItem.investment_date) }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Description</span>
+                    <p class="text-white mt-1.5">{{ viewingItem.description || 'No description provided' }}</p>
+                  </div>
+                </div>
+              </template>
+
+              <template v-if="activeTab === 'loans'">
+                <div class="bg-slate-800/50 backdrop-blur-sm p-5 rounded-xl border border-slate-700/30 space-y-4">
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Borrower Name</span>
+                    <p class="text-white mt-1.5 font-medium">{{ viewingItem.borrower_name }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Amount</span>
+                    <p class="text-white mt-1.5 font-medium">{{ formatCurrency(viewingItem.amount) }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Loan Date</span>
+                    <p class="text-white mt-1.5">{{ formatDate(viewingItem.loan_date) }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Due Date</span>
+                    <p class="text-white mt-1.5">{{ formatDate(viewingItem.due_date) }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Status</span>
+                    <p class="mt-1.5">
+                      <span class="px-3 py-1.5 rounded-full text-xs font-medium inline-block"
+                            :class="{
+                              'bg-amber-500/20 text-amber-400 border border-amber-500/20': viewingItem.status === 'pending',
+                              'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20': viewingItem.status === 'paid',
+                              'bg-rose-500/20 text-rose-400 border border-rose-500/20': viewingItem.status === 'overdue'
+                            }">
+                        {{ viewingItem.status.charAt(0).toUpperCase() + viewingItem.status.slice(1) }}
+                      </span>
+                    </p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Description</span>
+                    <p class="text-white mt-1.5">{{ viewingItem.description || 'No description provided' }}</p>
+                  </div>
+                </div>
+              </template>
+
+              <template v-if="activeTab === 'dailyExpenses'">
+                <div class="bg-slate-800/50 backdrop-blur-sm p-5 rounded-xl border border-slate-700/30 space-y-4">
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Category</span>
+                    <p class="text-white mt-1.5 font-medium">{{ viewingItem.category }}</p>
+                  </div>
+                  <div v-if="viewingItem.custom_category">
+                    <span class="text-sm font-medium text-cyan-400">Custom Category</span>
+                    <p class="text-white mt-1.5">{{ viewingItem.custom_category }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Description</span>
+                    <p class="text-white mt-1.5">{{ viewingItem.description || 'No description provided' }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Amount</span>
+                    <p class="text-white mt-1.5 font-medium">{{ formatCurrency(viewingItem.amount) }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Date</span>
+                    <p class="text-white mt-1.5">{{ formatDate(viewingItem.date) }}</p>
+                  </div>
+                </div>
+              </template>
+
+              <template v-if="activeTab === 'supplierPayments'">
+                <div class="bg-slate-800/50 backdrop-blur-sm p-5 rounded-xl border border-slate-700/30 space-y-4">
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Supplier</span>
+                    <p class="text-white mt-1.5 font-medium">{{ viewingItem.supplier?.name || '-' }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Product</span>
+                    <p class="text-white mt-1.5">{{ viewingItem.product?.name || '-' }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Total Cost</span>
+                    <p class="text-white mt-1.5 font-medium">{{ formatCurrency(viewingItem.total_cost) }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Remaining Balance</span>
+                    <p class="text-white mt-1.5 font-medium">{{ formatCurrency(viewingItem.remaining_balance) }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Status</span>
+                    <p class="mt-1.5">
+                      <span class="px-3 py-1.5 rounded-full text-xs font-medium inline-block"
+                            :class="{
+                              'bg-amber-500/20 text-amber-400 border border-amber-500/20': viewingItem.payment_status === 'advance',
+                              'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20': viewingItem.payment_status === 'full'
+                            }">
+                        {{ viewingItem.payment_status.charAt(0).toUpperCase() + viewingItem.payment_status.slice(1) }}
+                      </span>
+                    </p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Transactions</span>
+                    <table class="w-full mt-2 text-sm">
+                      <thead>
+                        <tr>
+                          <th class="text-left text-slate-400 font-semibold py-1">Amount Paid</th>
+                          <th class="text-left text-slate-400 font-semibold py-1">Method</th>
+                          <th class="text-left text-slate-400 font-semibold py-1">Check #</th>
+                          <th class="text-left text-slate-400 font-semibold py-1">Bank</th>
+                          <th class="text-left text-slate-400 font-semibold py-1">Paid At</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="tx in viewingItem.transactions" :key="tx.id">
+                          <td class="py-1 text-white">{{ formatCurrency(tx.amount_paid) }}</td>
+                          <td class="py-1 text-white">{{ tx.payment_method }}</td>
+                          <td class="py-1 text-white">{{ tx.check_number || '-' }}</td>
+                          <td class="py-1 text-white">{{ tx.bank_name || '-' }}</td>
+                          <td class="py-1 text-white">{{ formatDate(tx.paid_at) }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </template>
+
+              <template v-if="activeTab === 'employerPayments'">
+                <div class="bg-slate-800/50 backdrop-blur-sm p-5 rounded-xl border border-slate-700/30 space-y-4">
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Cashier Name</span>
+                    <p class="text-white mt-1.5 font-medium">{{ viewingItem.cashier?.name || '-' }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Salary Amount</span>
+                    <p class="text-white mt-1.5 font-medium">{{ formatCurrency(viewingItem.salary_amount) }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Payment Duration</span>
+                    <p class="text-white mt-1.5">{{ viewingItem.payment_duration }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Payment Date</span>
+                    <p class="text-white mt-1.5">{{ formatDate(viewingItem.payment_date) }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Payment Method</span>
+                    <p class="text-white mt-1.5">{{ viewingItem.payment_method }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Notes</span>
+                    <p class="text-white mt-1.5">{{ viewingItem.notes || 'No notes provided' }}</p>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+            <div class="flex justify-end mt-6 pt-4 border-t border-slate-700/50">
+              <button @click="showViewModal = false"
+                      class="px-5 py-2.5 bg-slate-700 text-white rounded-xl hover:bg-slate-600 transition-all shadow-lg flex items-center">
                 <XMarkIcon class="w-5 h-5 mr-2" />
                 Close
               </button>

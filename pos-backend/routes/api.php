@@ -26,6 +26,7 @@ use App\Http\Controllers\ProductReturnController;
 use App\Http\Controllers\SupplierPaymentController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\SalaryPaymentController;
+use App\Http\Controllers\EmployerPaymentController;
 
 // Cashier Routes
 Route::prefix('cashiers')->group(function () {
@@ -209,6 +210,12 @@ Route::get('/supplier-payments', [SupplierPaymentController::class, 'index']);
 Route::post('/supplier-payments', [SupplierPaymentController::class, 'store']);
 Route::put('/supplier-payments/{id}', [SupplierPaymentController::class, 'update']);
 Route::delete('/supplier-payments/{id}', [SupplierPaymentController::class, 'destroy']);
+
+Route::get('/employer-payments', [EmployerPaymentController::class, 'index']);
+Route::post('/employer-payments', [EmployerPaymentController::class, 'store']);
+Route::get('/employer-payments/{id}', [EmployerPaymentController::class, 'show']);
+Route::put('/employer-payments/{id}', [EmployerPaymentController::class, 'update']);
+Route::delete('/employer-payments/{id}', [EmployerPaymentController::class, 'destroy']);
 
 Route::get('/', function () {
     return response()->json([

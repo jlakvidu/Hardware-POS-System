@@ -12,23 +12,19 @@ class CashierController extends Controller
 {
     public function index()
     {
-        $cashiers = Cashier::all();
-        $data = $cashiers->map(function($cashier) {
-            return [
-                'id' => $cashier->id,
-                'name' => $cashier->name,
-                'email' => $cashier->email,
-                'password' => $cashier->password,
-                'contact_number' => $cashier->contact_number,
-                'image_url' => $cashier->image_path 
-                    ? url('storage/' . $cashier->image_path) 
-                    : null
-            ];
-        });
-
-        return response()->json([
-            'data' => $data
-        ]);
+        try {
+            $cashiers = Cashier::select('id', 'name', 'email', 'contact_number')->get();
+            return response()->json([
+                'status' => 'success',
+                'data' => $cashiers
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to fetch cashiers',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     public function store(Request $request)
@@ -54,13 +50,13 @@ class CashierController extends Controller
             }
 
             $createdCashier = Cashier::create($validatedAttributes);
-            
+
             $responseData = [
                 'id' => $createdCashier->id,
                 'name' => $createdCashier->name,
                 'email' => $createdCashier->email,
                 'contact_number' => $createdCashier->contact_number,
-                'image_url' => $createdCashier->image_path 
+                'image_url' => $createdCashier->image_path
                     ? url('storage/' . $createdCashier->image_path)
                     : null
             ];
@@ -100,7 +96,7 @@ class CashierController extends Controller
                 'name' => $existingCashier->name,
                 'email' => $existingCashier->email,
                 'contact_number' => $existingCashier->contact_number,
-                'image_url' => $existingCashier->image_path 
+                'image_url' => $existingCashier->image_path
                     ? url('storage/' . $existingCashier->image_path)
                     : null
             ]
