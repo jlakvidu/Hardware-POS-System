@@ -601,6 +601,15 @@ const handleSubmit = async () => {
     if (formMode.value === 'add') {
       if (activeTab.value === 'assets') {
         if (!isValidAssetForm.value) {
+          throw new Error('Please fill in all required asset fields correctly')
+        }
+        const response = await connection.post('/assets', formData.value)
+        assets.value.push(response.data)
+      } else if (activeTab.value === 'investments') {
+        if (!isValidInvestmentForm.value) {
+          throw new Error('Please fill in all required investment fields correctly')
+        }
+        const response = await connection.post('/investments', formData.value)
         investments.value.push(response.data)
       } else if (activeTab.value === 'loans') {
         if (!isValidLoanForm.value) {
@@ -612,10 +621,10 @@ const handleSubmit = async () => {
         if (!isValidDailyExpensesForm.value) {
           throw new Error('Please fill in all required daily expenses fields correctly')
         }
-        const response = await connection.post('/api/daily-expenses', formData.value) // Fixed endpoint
+        const response = await connection.post('/api/daily-expenses', formData.value)
         dailyExpenses.value.push(response.data)
       }
-      
+
       Swal.fire({
         icon: 'success',
         title: 'Success!',
@@ -654,45 +663,6 @@ const handleSubmit = async () => {
         if (index !== -1) dailyExpenses.value[index] = response.data
       }
       
-      Swal.fire({
-        icon: 'success',
-        title: 'Success!',
-        text: `${activeTab.value.slice(0, -1)} updated successfully`,
-        background: '#1e293b',
-        color: '#ffffff'
-      })
-    }
-    } else {
-      let response
-      if (activeTab.value === 'assets') {
-        if (!isValidAssetForm.value) {
-          throw new Error('Please fill in all required asset fields correctly')
-        }
-        response = await connection.put(`/assets/${currentItem.value.id}`, formData.value)
-        const index = assets.value.findIndex(item => item.id === currentItem.value.id)
-        if (index !== -1) assets.value[index] = response.data
-      } else if (activeTab.value === 'investments') {
-        if (!isValidInvestmentForm.value) {
-          throw new Error('Please fill in all required investment fields correctly')
-        }
-        response = await connection.put(`/investments/${currentItem.value.id}`, formData.value)
-        const index = investments.value.findIndex(item => item.id === currentItem.value.id)
-        if (index !== -1) investments.value[index] = response.data
-      } else if (activeTab.value === 'loans') {
-        if (!isValidLoanForm.value) {
-          throw new Error('Please fill in all required loan fields correctly')
-        }
-        response = await connection.put(`/loans/${currentItem.value.id}`, formData.value)
-        const index = loans.value.findIndex(item => item.id === currentItem.value.id)
-        if (index !== -1) loans.value[index] = response.data
-      } else if (activeTab.value === 'dailyExpenses') {
-        if (!isValidDailyExpensesForm.value) {
-          throw new Error('Please fill in all required daily expenses fields correctly')
-        }
-        response = await connection.put(`/api/daily-expenses/${currentItem.value.id}`, formData.value) // Fixed endpoint
-        const index = dailyExpenses.value.findIndex(item => item.id === currentItem.value.id)
-        if (index !== -1) dailyExpenses.value[index] = response.data
-      }
       Swal.fire({
         icon: 'success',
         title: 'Success!',
