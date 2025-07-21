@@ -213,9 +213,13 @@ const filteredItems = computed(() => {
           item.payment_method === employerPaymentSearchValue.value
         )
       } else if (employerPaymentSearchType.value === 'payment_date') {
-        return items.filter(item =>
-          item.payment_date === employerPaymentSearchValue.value
-        )
+        // Compare only the date part (YYYY-MM-DD)
+        return items.filter(item => {
+          const itemDate = item.payment_date
+            ? new Date(item.payment_date).toISOString().split('T')[0]
+            : ''
+          return itemDate === employerPaymentSearchValue.value
+        })
       } else if (employerPaymentSearchType.value === 'payment_duration') {
         return items.filter(item =>
           item.payment_duration === employerPaymentSearchValue.value
@@ -968,7 +972,7 @@ const showSidebar = () => { isSidebarVisible.value = true }
             <div class="flex gap-2 items-center">
               <label class="text-xs text-slate-400 font-medium mr-2">Search By:</label>
               <select v-model="employerPaymentSearchType"
-                      class="bg-slate-800/80 border border-slate-600/50 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 text-xs">
+                      class="bg-slate-800/80 border border-slate-600/50 rounded-xl px-1 py-3 text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 text-xs">
                 <option value="name">Employer Name</option>
                 <option value="payment_method">Payment Method</option>
                 <option value="payment_date">Payment Date</option>
