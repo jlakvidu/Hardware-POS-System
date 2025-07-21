@@ -93,8 +93,7 @@ class SalaryPaymentController extends Controller
         if (!$salaryPayment) {
             return response()->json(['error' => 'Salary payment not found'], 404);
         }
-        // Use a professional invoice template
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('salary_invoice', ['salaryPayment' => $salaryPayment]);
+        $pdf = Pdf::loadView('salary_invoice', ['salaryPayment' => $salaryPayment]);
         $filename = 'Salary-Invoice-' . ($salaryPayment->invoice_number ?? $salaryPayment->id) . '.pdf';
         return $pdf->download($filename);
     }
