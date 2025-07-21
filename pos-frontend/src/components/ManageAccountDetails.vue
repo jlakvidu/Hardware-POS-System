@@ -11,6 +11,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { connection } from '@/api/axios'
 import Swal from 'sweetalert2'
+import html2pdf from 'html2pdf.js'
 
 // Formatter functions
 const formatCurrency = (value) => {
@@ -42,6 +43,8 @@ const sortDirection = ref('asc')
 const currentItem = ref(null)
 const showViewModal = ref(false)
 const viewingItem = ref(null)
+const showEmployerPaymentReceipt = ref(false)
+const employerPaymentReceiptData = ref(null)
 
 // Data storage
 const assets = ref([])
@@ -80,7 +83,7 @@ const formData = ref({
   // Employer Payment fields
   cashier_id: '',
   salary_amount: '',
-  payment_duration: '', // <-- add this
+  payment_duration: '',
   payment_date: new Date().toISOString().split('T')[0],
   payment_method: 'cash',
   notes: ''
@@ -351,7 +354,7 @@ const isValidEmployerPaymentForm = computed(() => {
     formData.value.cashier_id &&
     formData.value.salary_amount &&
     Number(formData.value.salary_amount) > 0 &&
-    formData.value.payment_duration && // <-- add this
+    formData.value.payment_duration &&
     formData.value.payment_date &&
     formData.value.payment_method 
   )
@@ -478,7 +481,7 @@ const openEditForm = (item) => {
     formData.value = {
       cashier_id: item.cashier_id || '',
       salary_amount: item.salary_amount || '',
-      payment_duration: item.payment_duration || '', // <-- add this
+      payment_duration: item.payment_duration || '',
       payment_date: item.payment_date || new Date().toISOString().split('T')[0],
       payment_method: item.payment_method || 'cash',
       notes: item.notes || ''
@@ -512,12 +515,29 @@ const resetForm = () => {
     date: new Date().toISOString().split('T')[0],
     cashier_id: '',
     salary_amount: '',
-    payment_duration: '', // <-- add this
+    payment_duration: '',
     payment_date: new Date().toISOString().split('T')[0],
     payment_method: 'cash',
     notes: ''
   }
   currentItem.value = null
+}
+
+const printEmployerPaymentReceipt = () => {
+  const element = document.getElementById('employer-payment-receipt-content')
+  const opt = {
+    margin: [10, 10, 10, 10],
+    filename: `employer-payment-${employerPaymentReceiptData.value?.id || 'receipt'}.pdf`,
+    image: { type: 'jpeg', quality: 1 },
+    html2canvas: { scale: 2, useCORS: true, logging: false },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  }
+  html2pdf().set(opt).from(element).save()
+}
+
+const closeEmployerPaymentReceipt = () => {
+  showEmployerPaymentReceipt.value = false
+  employerPaymentReceiptData.value = null
 }
 
 const handleSubmit = async () => {
@@ -544,6 +564,11 @@ const handleSubmit = async () => {
         if (response.data) {
           const newPayment = response.data.data;
           employerPayments.value.push(newPayment);
+          employerPaymentReceiptData.value = {
+            ...newPayment,
+            cashier: cashiers.value.find(c => c.id === newPayment.cashier_id)
+          }
+          showEmployerPaymentReceipt.value = true
           await Swal.fire({
             icon: 'success',
             title: 'Success!',
@@ -1284,7 +1309,7 @@ const showSidebar = () => { isSidebarVisible.value = true }
                 <tr class="text-left border-b border-slate-700/50 bg-slate-800/30">
                   <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Cashier Name</th>
                   <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Salary Amount</th>
-                  <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Payment Duration</th> <!-- new column -->
+                  <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Payment Duration</th>
                   <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Payment Date</th>
                   <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Payment Method</th>
                   <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Notes</th>
@@ -1819,6 +1844,75 @@ const showSidebar = () => { isSidebarVisible.value = true }
                       class="px-5 py-2.5 bg-slate-700 text-white rounded-xl hover:bg-slate-600 transition-all shadow-lg flex items-center">
                 <XMarkIcon class="w-5 h-5 mr-2" />
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="showEmployerPaymentReceipt" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" @click="closeEmployerPaymentReceipt"></div>
+          <div class="relative bg-white rounded-lg shadow-xl w-full max-w-[500px] z-10 animate-scale-in overflow-auto max-h-[90vh]">
+            <div class="flex justify-between items-center px-6 py-4 border-b border-gray-200">
+              <div class="text-xl font-bold text-gray-800 flex items-center gap-2">
+                <BanknotesIcon class="w-6 h-6 text-indigo-500" />
+                Employer Payment Receipt
+              </div>
+              <button @click="closeEmployerPaymentReceipt" class="p-2 hover:bg-gray-200 rounded-full transition-colors">
+                <XMarkIcon class="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <div id="employer-payment-receipt-content" class="p-6 text-gray-800">
+              <div class="mb-4">
+                <div class="text-2xl font-bold text-indigo-600">Weads Horana Pvt Ltd</div>
+                <div class="text-sm text-gray-600 mt-1">
+                  102 Railway Ave.<br>
+                  Kandy, Sri Lanka<br>
+                  Phone: (94) 81 123 4567<br>
+                  Email: info@hardwaresupply.com
+                </div>
+              </div>
+              <div class="mb-4">
+                <div class="text-base font-bold text-gray-800">Receipt #: {{ employerPaymentReceiptData?.id }}</div>
+                <div class="text-sm text-gray-600">Date: <span class="text-gray-800">{{ formatDate(employerPaymentReceiptData?.payment_date) }}</span></div>
+              </div>
+              <div class="mb-4">
+                <div class="text-sm text-gray-600 uppercase tracking-wider mb-1">Cashier</div>
+                <div class="text-base font-bold text-gray-800">{{ employerPaymentReceiptData?.cashier?.name || '-' }}</div>
+              </div>
+              <div class="mb-4">
+                <div class="text-sm text-gray-600 uppercase tracking-wider mb-1">Payment Details</div>
+                <div class="space-y-1 text-sm">
+                  <div class="flex justify-between">
+                    <span class="text-gray-600">Salary Amount:</span>
+                    <span class="text-indigo-600 font-bold">{{ formatCurrency(employerPaymentReceiptData?.salary_amount) }}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-gray-600">Payment Duration:</span>
+                    <span class="text-gray-800">{{ employerPaymentReceiptData?.payment_duration }}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-gray-600">Payment Method:</span>
+                    <span class="text-gray-800">{{ employerPaymentReceiptData?.payment_method }}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-gray-600">Notes:</span>
+                    <span class="text-gray-800">{{ employerPaymentReceiptData?.notes || '-' }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="mt-8 text-xs text-gray-500">
+                <div class="font-medium text-gray-600 mb-1">Terms & Conditions:</div>
+                <ul class="list-disc pl-4 space-y-1">
+                  <li>Payment is final and non-refundable</li>
+                  <li>All prices are in Sri Lankan Rupees (Rs.)</li>
+                </ul>
+              </div>
+            </div>
+            <div class="sticky bottom-0 bg-white p-4 border-t border-gray-200">
+              <button @click="printEmployerPaymentReceipt"
+                class="w-full py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg transition-colors duration-200 flex items-center justify-center gap-2">
+                <BanknotesIcon class="w-5 h-5" />
+                <span>Download PDF</span>
               </button>
             </div>
           </div>
