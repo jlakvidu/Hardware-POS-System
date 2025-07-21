@@ -181,6 +181,53 @@ const validateEmployerPaymentTextField = (field, value) => {
 }
 
 // Computed properties
+const tabHeaderInfo = computed(() => {
+  switch (activeTab.value) {
+    case 'assets':
+      return {
+        icon: BuildingLibraryIcon,
+        topic: 'Assets',
+        description: 'Manage your financial assets'
+      }
+    case 'investments':
+      return {
+        icon: BanknotesIcon,
+        topic: 'Investments',
+        description: 'Track your investments and returns'
+      }
+    case 'loans':
+      return {
+        icon: ArrowsRightLeftIcon,
+        topic: 'Loans',
+        description: 'Monitor loans and repayments'
+      }
+    case 'dailyExpenses':
+      return {
+        icon: ArrowsRightLeftIcon,
+        topic: 'Daily Expenses',
+        description: 'Record and analyze daily expenses'
+      }
+    case 'supplierPayments':
+      return {
+        icon: BanknotesIcon,
+        topic: 'Supplier Payments',
+        description: 'View and manage supplier payments'
+      }
+    case 'employerPayments':
+      return {
+        icon: BanknotesIcon,
+        topic: 'Employer Payments',
+        description: 'Manage employer salary payments'
+      }
+    default:
+      return {
+        icon: BuildingLibraryIcon,
+        topic: 'Financial Details',
+        description: 'Manage your financial assets'
+      }
+  }
+})
+
 const filteredItems = computed(() => {
   let items = []
   
@@ -893,18 +940,18 @@ const showSidebar = () => { isSidebarVisible.value = true }
     <Sidebar :isVisible="isSidebarVisible" @closeSidebar="closeSidebar" />
     <Header @toggleSidebar="toggleSidebar" />
 
-    <div class="w-full p-4 lg:p-8 pt-28 lg:pt-28">
-      <div class="financial-details-container h-screen w-full bg-gradient-to-b from-slate-900 to-slate-800 text-white flex flex-col">
-        <div class="px-6 py-5 flex items-center justify-between border-b border-slate-700/50 backdrop-blur-sm bg-slate-900/80">
+    <div class="w-full p-2 sm:p-4 lg:p-8 pt-24 lg:pt-28">
+      <div class="financial-details-container h-full w-full bg-gradient-to-b from-slate-900 to-slate-800 text-white flex flex-col">
+        <div class="px-2 sm:px-6 py-5 flex items-center justify-between border-b border-slate-700/50 backdrop-blur-sm bg-slate-900/80">
           <div class="flex items-center">
             <div class="bg-indigo-500/10 p-2.5 rounded-xl mr-3">
-              <BuildingLibraryIcon class="w-6 h-6 text-indigo-400" />
+              <component :is="tabHeaderInfo.icon" class="w-6 h-6 text-indigo-400" />
             </div>
             <div>
               <h1 class="text-xl font-medium">
-                Financial <span class="text-indigo-400 font-bold">Details</span>
+                {{ tabHeaderInfo.topic }} <span class="text-indigo-400 font-bold">Details</span>
               </h1>
-              <p class="text-xs text-slate-400">Manage your financial assets</p>
+              <p class="text-xs text-slate-400">{{ tabHeaderInfo.description }}</p>
             </div>
           </div>
           <div class="flex items-center space-x-5">
@@ -919,7 +966,7 @@ const showSidebar = () => { isSidebarVisible.value = true }
           </div>
         </div>
 
-        <div class="px-6 py-3 border-b border-slate-700/50 flex bg-slate-800/50 backdrop-blur-sm">
+        <div class="px-2 sm:px-6 py-3 border-b border-slate-700/50 flex flex-wrap bg-slate-800/50 backdrop-blur-sm">
           <button @click="setActiveTab('assets')" 
                   class="px-4 py-2.5 rounded-lg flex items-center mr-2 transition-all duration-200"
                   :class="activeTab === 'assets' ? 'bg-indigo-500/20 text-indigo-300 shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-700/30'">
@@ -958,7 +1005,7 @@ const showSidebar = () => { isSidebarVisible.value = true }
           </button>
         </div>
 
-        <div class="px-6 py-4 border-b border-slate-700/50 bg-slate-800/30">
+        <div class="px-2 sm:px-6 py-4 border-b border-slate-700/50 bg-slate-800/30">
           <div v-if="activeTab !== 'employerPayments'" class="relative">
             <input v-model="searchQuery"
                    type="text" 
@@ -1040,10 +1087,10 @@ const showSidebar = () => { isSidebarVisible.value = true }
               <span>Add {{ activeTab.slice(0, -1) }}</span>
             </button>
           </div>
-          <div v-else-if="activeTab === 'assets'" class="w-full">
-            <table class="w-full border-collapse">
-              <thead>
-                <tr class="text-left border-b border-slate-700/50 bg-slate-800/30">
+          <div v-else-if="activeTab === 'assets'" class="w-full overflow-x-auto">
+            <table class="w-full min-w-[600px] border-collapse block sm:table">
+              <thead class="block sm:table-header-group">
+                <tr class="text-left border-b border-slate-700/50 bg-slate-800/30 block sm:table-row">
                   <th @click="toggleSort('name')" 
                       class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase cursor-pointer hover:text-white">
                     <div class="flex items-center">
@@ -1075,8 +1122,8 @@ const showSidebar = () => { isSidebarVisible.value = true }
                   <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody>
-                <tr v-for="item in sortedItems" :key="item.id" class="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors">
+              <tbody class="block sm:table-row-group">
+                <tr v-for="item in sortedItems" :key="item.id" class="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors block sm:table-row">
                   <td class="px-6 py-4 text-white font-medium">{{ item.name }}</td>
                   <td class="px-6 py-4 text-slate-300">{{ item.type }}</td>
                   <td class="px-6 py-4 text-slate-300">{{ item.location }}</td>
@@ -1099,10 +1146,10 @@ const showSidebar = () => { isSidebarVisible.value = true }
             </table>
           </div>
 
-          <div v-else-if="activeTab === 'investments'" class="w-full">
-            <table class="w-full border-collapse">
-              <thead>
-                <tr class="text-left border-b border-slate-700/50 bg-slate-800/30">
+          <div v-else-if="activeTab === 'investments'" class="w-full overflow-x-auto">
+            <table class="w-full min-w-[600px] border-collapse block sm:table">
+              <thead class="block sm:table-header-group">
+                <tr class="text-left border-b border-slate-700/50 bg-slate-800/30 block sm:table-row">
                   <th @click="toggleSort('investor_name')" 
                       class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase cursor-pointer hover:text-white">
                     <div class="flex items-center">
@@ -1134,8 +1181,8 @@ const showSidebar = () => { isSidebarVisible.value = true }
                   <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody>
-                <tr v-for="item in sortedItems" :key="item.id" class="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors">
+              <tbody class="block sm:table-row-group">
+                <tr v-for="item in sortedItems" :key="item.id" class="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors block sm:table-row">
                   <td class="px-6 py-4 text-white font-medium">{{ item.investor_name }}</td>
                   <td class="px-6 py-4 text-slate-300 font-medium">{{ formatCurrency(item.amount) }}</td>
                   <td class="px-6 py-4 text-slate-300">{{ formatDate(item.investment_date) }}</td>
@@ -1158,10 +1205,10 @@ const showSidebar = () => { isSidebarVisible.value = true }
             </table>
           </div>
 
-          <div v-else-if="activeTab === 'loans'" class="w-full">
-            <table class="w-full border-collapse">
-              <thead>
-                <tr class="text-left border-b border-slate-700/50 bg-slate-800/30">
+          <div v-else-if="activeTab === 'loans'" class="w-full overflow-x-auto">
+            <table class="w-full min-w-[700px] border-collapse block sm:table">
+              <thead class="block sm:table-header-group">
+                <tr class="text-left border-b border-slate-700/50 bg-slate-800/30 block sm:table-row">
                   <th @click="toggleSort('borrower_name')" 
                       class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase cursor-pointer hover:text-white">
                     <div class="flex items-center">
@@ -1200,8 +1247,8 @@ const showSidebar = () => { isSidebarVisible.value = true }
                   <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody>
-                <tr v-for="item in sortedItems" :key="item.id" class="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors">
+              <tbody class="block sm:table-row-group">
+                <tr v-for="item in sortedItems" :key="item.id" class="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors block sm:table-row">
                   <td class="px-6 py-4 text-white font-medium">{{ item.borrower_name }}</td>
                   <td class="px-6 py-4 text-slate-300 font-medium">{{ formatCurrency(item.amount) }}</td>
                   <td class="px-6 py-4 text-slate-300">{{ formatDate(item.loan_date) }}</td>
@@ -1234,10 +1281,10 @@ const showSidebar = () => { isSidebarVisible.value = true }
             </table>
           </div>
 
-          <div v-else-if="activeTab === 'dailyExpenses'" class="w-full">
-            <table class="w-full border-collapse">
-              <thead>
-                <tr class="text-left border-b border-slate-700/50 bg-slate-800/30">
+          <div v-else-if="activeTab === 'dailyExpenses'" class="w-full overflow-x-auto">
+            <table class="w-full min-w-[700px] border-collapse block sm:table">
+              <thead class="block sm:table-header-group">
+                <tr class="text-left border-b border-slate-700/50 bg-slate-800/30 block sm:table-row">
                   <th @click="toggleSort('category')" 
                       class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase cursor-pointer hover:text-white">
                     <div class="flex items-center">
@@ -1276,8 +1323,8 @@ const showSidebar = () => { isSidebarVisible.value = true }
                   <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody>
-                <tr v-for="item in sortedItems" :key="item.id" class="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors">
+              <tbody class="block sm:table-row-group">
+                <tr v-for="item in sortedItems" :key="item.id" class="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors block sm:table-row">
                   <td class="px-6 py-4 text-white font-medium">{{ item.category }}</td>
                   <td class="px-6 py-4 text-slate-300">{{ item.custom_category || '-' }}</td>
                   <td class="px-6 py-4 text-slate-300">{{ item.description || '-' }}</td>
@@ -1301,10 +1348,10 @@ const showSidebar = () => { isSidebarVisible.value = true }
             </table>
           </div>
 
-          <div v-else-if="activeTab === 'supplierPayments'" class="w-full">
-            <table class="w-full border-collapse">
-              <thead>
-                <tr class="text-left border-b border-slate-700/50 bg-slate-800/30">
+          <div v-else-if="activeTab === 'supplierPayments'" class="w-full overflow-x-auto">
+            <table class="w-full min-w-[700px] border-collapse block sm:table">
+              <thead class="block sm:table-header-group">
+                <tr class="text-left border-b border-slate-700/50 bg-slate-800/30 block sm:table-row">
                   <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Supplier</th>
                   <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Product</th>
                   <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Total Cost</th>
@@ -1313,8 +1360,8 @@ const showSidebar = () => { isSidebarVisible.value = true }
                   <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody>
-                <tr v-for="item in sortedItems" :key="item.id" class="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors">
+              <tbody class="block sm:table-row-group">
+                <tr v-for="item in sortedItems" :key="item.id" class="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors block sm:table-row">
                   <td class="px-6 py-4 text-white font-medium">{{ item.supplier?.name || '-' }}</td>
                   <td class="px-6 py-4 text-slate-300">{{ item.product?.name || '-' }}</td>
                   <td class="px-6 py-4 text-slate-300 font-medium">{{ formatCurrency(item.total_cost) }}</td>
@@ -1343,10 +1390,10 @@ const showSidebar = () => { isSidebarVisible.value = true }
             </table>
           </div>
 
-          <div v-else-if="activeTab === 'employerPayments'" class="w-full">
-            <table class="w-full border-collapse">
-              <thead>
-                <tr class="text-left border-b border-slate-700/50 bg-slate-800/30">
+          <div v-else-if="activeTab === 'employerPayments'" class="w-full overflow-x-auto">
+            <table class="w-full min-w-[700px] border-collapse block sm:table">
+              <thead class="block sm:table-header-group">
+                <tr class="text-left border-b border-slate-700/50 bg-slate-800/30 block sm:table-row">
                   <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Cashier Name</th>
                   <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Salary Amount</th>
                   <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Payment Duration</th>
@@ -1356,8 +1403,8 @@ const showSidebar = () => { isSidebarVisible.value = true }
                   <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody>
-                <tr v-for="item in sortedItems" :key="item.id" class="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors">
+              <tbody class="block sm:table-row-group">
+                <tr v-for="item in sortedItems" :key="item.id" class="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors block sm:table-row">
                   <td class="px-6 py-4 text-white font-medium">{{ item.cashier?.name || '-' }}</td>
                   <td class="px-6 py-4 text-slate-300 font-medium">{{ formatCurrency(item.salary_amount) }}</td>
                   <td class="px-6 py-4 text-slate-300">
@@ -1425,7 +1472,7 @@ const showSidebar = () => { isSidebarVisible.value = true }
         </div>
 
         <div v-if="showForm" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm">
-          <div class="bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl border border-slate-700/50 shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+          <div class="bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl border border-slate-700/50 shadow-2xl w-full max-w-lg mx-2 sm:mx-4 overflow-hidden">
             <div class="px-6 py-4 border-b border-slate-700/50 flex items-center justify-between bg-slate-800/80">
               <h3 class="text-lg font-medium text-white flex items-center">
                 <span class="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center mr-3">
@@ -1668,8 +1715,8 @@ const showSidebar = () => { isSidebarVisible.value = true }
           </div>
         </div>
 
-        <div v-if="showViewModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div class="bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl w-full max-w-xl p-6 shadow-2xl border border-slate-700/50 max-h-[90vh] overflow-auto">
+        <div v-if="showViewModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+          <div class="bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl w-full max-w-xl p-4 sm:p-6 shadow-2xl border border-slate-700/50 max-h-[90vh] overflow-auto">
             <div class="flex justify-between items-center mb-6 border-b border-slate-700/50 pb-4">
               <div class="flex items-center space-x-3">
                 <div class="w-10 h-10 rounded-xl bg-cyan-500/20 flex items-center justify-center">
@@ -1889,7 +1936,7 @@ const showSidebar = () => { isSidebarVisible.value = true }
           </div>
         </div>
 
-        <div v-if="showEmployerPaymentReceipt" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div v-if="showEmployerPaymentReceipt" class="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
           <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" @click="closeEmployerPaymentReceipt"></div>
           <div class="relative bg-white rounded-lg shadow-xl w-full max-w-[500px] z-10 animate-scale-in overflow-auto max-h-[90vh]">
             <div class="flex justify-between items-center px-6 py-4 border-b border-gray-200">
@@ -1965,6 +2012,20 @@ const showSidebar = () => { isSidebarVisible.value = true }
 <style scoped>
 .financial-details-container {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+/* Responsive table styles */
+@media (max-width: 640px) {
+  .financial-details-container table {
+    font-size: 0.85rem;
+  }
+  .financial-details-container th,
+  .financial-details-container td {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+  }
 }
 
 ::-webkit-scrollbar {
