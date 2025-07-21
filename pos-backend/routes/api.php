@@ -210,16 +210,6 @@ Route::post('/supplier-payments', [SupplierPaymentController::class, 'store']);
 Route::put('/supplier-payments/{id}', [SupplierPaymentController::class, 'update']);
 Route::delete('/supplier-payments/{id}', [SupplierPaymentController::class, 'destroy']);
 
-// Salary Payment Routes
-Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/salary-payments', [SalaryPaymentController::class, 'index']);
-    Route::post('/salary-payments', [SalaryPaymentController::class, 'store']);
-    Route::get('/salary-payments/{id}', [SalaryPaymentController::class, 'show']);
-    Route::put('/salary-payments/{id}', [SalaryPaymentController::class, 'update']);
-    Route::delete('/salary-payments/{id}', [SalaryPaymentController::class, 'destroy']);
-    Route::get('/salary-payments/{id}/invoice', [SalaryPaymentController::class, 'exportInvoicePdf']); // <-- Add this line
-});
-
 Route::get('/', function () {
     return response()->json([
         'status' => 'success',

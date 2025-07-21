@@ -7,8 +7,7 @@ import {
   PencilIcon, TrashIcon, PlusIcon,
   MagnifyingGlassIcon, ArrowsRightLeftIcon,
   ChevronUpIcon, ChevronDownIcon,
-  EyeIcon, XMarkIcon,
-  UserIcon, DocumentTextIcon
+  EyeIcon, XMarkIcon
 } from '@heroicons/vue/24/outline'
 import { connection } from '@/api/axios'
 import Swal from 'sweetalert2'
@@ -77,167 +76,75 @@ const formData = ref({
   date: new Date().toISOString().split('T')[0], // Default to today
 })
 
-// Salary Payments State
-const salaryPayments = ref([])
-const cashiers = ref([]) // Only use cashiers
-const salaryFormData = ref({
-  cashier_id: '', // Use cashier_id
-  payment_period: '',
-  payment_date: new Date().toISOString().split('T')[0],
-  base_salary: '',
-  additions: 0,
-  deductions: 0,
-  net_pay: 0,
-  payment_method: 'cash',
-  notes: ''
-})
-const salaryFormMode = ref('add')
-const showSalaryForm = ref(false)
-const salaryCurrentItem = ref(null)
-const salaryIsSubmitting = ref(false)
-const salarySearchQuery = ref('')
-const salarySortField = ref('payment_date')
-const salarySortDirection = ref('desc')
-const showSalaryViewModal = ref(false)
-const viewingSalaryItem = ref(null)
-
-// Fetch employees and salary payments
-const fetchSalaryData = async () => {
-  try {
-    const [cashierRes, salaryRes] = await Promise.all([
-      connection.get('/cashiers'),
-      connection.get('/salary-payments')
-    ])
-    // Handle both { data: [...] } and [...] response shapes
-    cashiers.value = Array.isArray(cashierRes.data) ? cashierRes.data : (cashierRes.data.data || [])
-    salaryPayments.value = Array.isArray(salaryRes.data) ? salaryRes.data : (salaryRes.data.data || [])
-    console.log('Fetched salaryPayments:', salaryPayments.value) // <-- Add this line
-  } catch (err) {
-    Swal.fire({ icon: 'error', title: 'Error!', text: 'Failed to load salary data', background: '#1e293b', color: '#fff' })
-  }
-}
-
-// Salary computed properties
-const filteredSalaryPayments = computed(() => {
-  if (!salarySearchQuery.value) return salaryPayments.value
-  return salaryPayments.value.filter(item => {
-    // Try both: nested cashier object and matching by cashier_id
-    const cashierName = item.cashier?.name || cashiers.value.find(c => c.id === item.cashier_id)?.name || ''
-    return (
-      cashierName.toLowerCase().includes(salarySearchQuery.value.toLowerCase()) ||
-      item.payment_period?.toLowerCase().includes(salarySearchQuery.value.toLowerCase()) ||
-      item.payment_method?.toLowerCase().includes(salarySearchQuery.value.toLowerCase())
-    )
-  })
-})
-const sortedSalaryPayments = computed(() => {
-  return [...filteredSalaryPayments.value].sort((a, b) => {
-    let aValue = a[salarySortField.value]
-    let bValue = b[salarySortField.value]
-    if (salarySortField.value === 'payment_date') {
-      aValue = new Date(aValue)
-      bValue = new Date(bValue)
-    }
-    if (aValue < bValue) return salarySortDirection.value === 'asc' ? -1 : 1
-    if (aValue > bValue) return salarySortDirection.value === 'asc' ? 1 : -1
-    return 0
-  })
-})
-const totalSalaryPaid = computed(() => {
-  return salaryPayments.value.reduce((sum, p) => sum + parseFloat(p.net_pay || 0), 0)
+// Add validation state for asset fields
+const assetFieldErrors = ref({
+  name: '',
+  type: '',
+  location: ''
 })
 
-// Salary form helpers
-// Removed duplicate openSalaryForm function declaration
-const openSalaryEditForm = (item) => {
-  salaryFormMode.value = 'edit'
-  salaryCurrentItem.value = item
-  salaryFormData.value = { ...item }
-  showSalaryForm.value = true
-}
-const closeSalaryForm = () => {
-  showSalaryForm.value = false
-  resetSalaryForm()
-}
-const resetSalaryForm = () => {
-  salaryFormData.value = {
-    cashier_id: '',
-    payment_period: '',
-    payment_date: new Date().toISOString().split('T')[0],
-    base_salary: '',
-    additions: 0,
-    deductions: 0,
-    net_pay: 0,
-    payment_method: 'cash',
-    notes: ''
-  }
-  salaryCurrentItem.value = null
-}
-const handleSalaryFormChange = () => {
-  // Auto-calculate net pay
-  const base = Number(salaryFormData.value.base_salary) || 0
-  const add = Number(salaryFormData.value.additions) || 0
-  const ded = Number(salaryFormData.value.deductions) || 0
-  salaryFormData.value.net_pay = base + add - ded
-}
-const handleSalarySubmit = async () => {
-  if (!salaryFormData.value.cashier_id || !salaryFormData.value.payment_period || !salaryFormData.value.payment_date || !salaryFormData.value.base_salary || salaryIsSubmitting.value) return
-  salaryIsSubmitting.value = true
-  try {
-    let response
-    if (salaryFormMode.value === 'add') {
-      response = await connection.post('/salary-payments', salaryFormData.value)
-      salaryPayments.value.push(response.data)
-      Swal.fire({ icon: 'success', title: 'Success!', text: 'Salary payment added', background: '#1e293b', color: '#fff' })
-    } else {
-      response = await connection.put(`/salary-payments/${salaryCurrentItem.value.id}`, salaryFormData.value)
-      const idx = salaryPayments.value.findIndex(p => p.id === salaryCurrentItem.value.id)
-      if (idx !== -1) salaryPayments.value[idx] = response.data
-      Swal.fire({ icon: 'success', title: 'Success!', text: 'Salary payment updated', background: '#1e293b', color: '#fff' })
-    }
-    closeSalaryForm()
-  } catch (err) {
-    Swal.fire({ icon: 'error', title: 'Error!', text: err.message || 'Failed to save salary payment', background: '#1e293b', color: '#fff' })
-  } finally {
-    salaryIsSubmitting.value = false
-  }
-}
-const deleteSalaryPayment = async (item) => {
-  try {
-    const result = await Swal.fire({
-      title: 'Delete Salary Payment?',
-      text: 'Are you sure you want to delete this salary payment?',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#EF4444',
-      cancelButtonColor: '#6B7280',
-      confirmButtonText: 'Yes, delete it',
-      background: '#1e293b',
-      color: '#fff'
-    })
-    if (result.isConfirmed) {
-      await connection.delete(`/salary-payments/${item.id}`)
-      salaryPayments.value = salaryPayments.value.filter(p => p.id !== item.id)
-      Swal.fire({ icon: 'success', title: 'Deleted!', text: 'Salary payment deleted.', background: '#1e293b', color: '#fff' })
-    }
-  } catch (err) {
-    Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to delete salary payment.', background: '#1e293b', color: '#fff' })
-  }
-}
-const viewSalaryDetails = (item) => {
-  viewingSalaryItem.value = item
-  showSalaryViewModal.value = true
-}
-const getSalarySortIcon = (field) => {
-  if (salarySortField.value !== field) return null
-  return salarySortDirection.value === 'asc' ? ChevronUpIcon : ChevronDownIcon
-}
-const toggleSalarySort = (field) => {
-  if (salarySortField.value === field) {
-    salarySortDirection.value = salarySortDirection.value === 'asc' ? 'desc' : 'asc'
+// Validation function for text-only fields
+const validateAssetTextField = (field, value) => {
+  const regex = /^[A-Za-z\s]+$/
+  if (!value.trim()) {
+    assetFieldErrors.value[field] = ''
+  } else if (!regex.test(value.trim())) {
+    assetFieldErrors.value[field] = 'Only letters and spaces are allowed'
   } else {
-    salarySortField.value = field
-    salarySortDirection.value = 'asc'
+    assetFieldErrors.value[field] = ''
+  }
+}
+
+// Add validation state for investment fields
+const investmentFieldErrors = ref({
+  investor_name: '',
+  description: ''
+})
+
+// Validation function for text-only fields (letters and spaces)
+const validateInvestmentTextField = (field, value) => {
+  const regex = /^[A-Za-z\s]+$/
+  if (!value.trim()) {
+    investmentFieldErrors.value[field] = ''
+  } else if (!regex.test(value.trim())) {
+    investmentFieldErrors.value[field] = 'Only letters and spaces are allowed'
+  } else {
+    investmentFieldErrors.value[field] = ''
+  }
+}
+
+// Add validation state for loan fields
+const loanFieldErrors = ref({
+  borrower_name: '',
+  description: ''
+})
+
+// Validation function for loan text-only fields
+const validateLoanTextField = (field, value) => {
+  const regex = /^[A-Za-z\s]+$/
+  if (!value.trim()) {
+    loanFieldErrors.value[field] = ''
+  } else if (!regex.test(value.trim())) {
+    loanFieldErrors.value[field] = 'Only letters and spaces are allowed'
+  } else {
+    loanFieldErrors.value[field] = ''
+  }
+}
+
+// Add validation state for daily expenses fields
+const dailyExpensesFieldErrors = ref({
+  description: ''
+})
+
+// Validation function for daily expenses description (text only)
+const validateDailyExpensesTextField = (field, value) => {
+  const regex = /^[A-Za-z\s]+$/
+  if (!value.trim()) {
+    dailyExpensesFieldErrors.value[field] = ''
+  } else if (!regex.test(value.trim())) {
+    dailyExpensesFieldErrors.value[field] = 'Only letters and spaces are allowed'
+  } else {
+    dailyExpensesFieldErrors.value[field] = ''
   }
 }
 
@@ -260,9 +167,6 @@ const filteredItems = computed(() => {
       break
     case 'supplierPayments':
       items = supplierPayments.value
-      break
-    case 'salaryPayments': // <-- Add this case
-      items = salaryPayments.value
       break
   }
   
@@ -288,10 +192,6 @@ const filteredItems = computed(() => {
       return item.supplier?.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
              item.product?.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
              item.payment_status.toLowerCase().includes(searchQuery.value.toLowerCase())
-    } else if (activeTab.value === 'salaryPayments') {
-      return item.cashier?.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-             item.payment_period?.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-             item.payment_method?.toLowerCase().includes(searchQuery.value.toLowerCase())
     }
     return false
   })
@@ -479,11 +379,7 @@ const openAddForm = () => {
   resetForm()
   showForm.value = true
 }
-const openSalaryForm = () => {
-  salaryFormMode.value = 'add'
-  resetSalaryForm()
-  showSalaryForm.value = true
-}
+
 const openEditForm = (item) => {
   formMode.value = 'edit'
   currentItem.value = item
@@ -747,8 +643,6 @@ const getActiveItems = () => {
       return dailyExpenses.value
     case 'supplierPayments':
       return supplierPayments.value
-    case 'salaryPayments':
-      return salaryPayments.value // <-- Add this line
     default:
       return []
   }
@@ -791,7 +685,6 @@ const updateOverdueLoans = (loansList) => {
 // Lifecycle hooks
 onMounted(() => {
   fetchData()
-  fetchSalaryData()
   const intervalId = setInterval(() => {
     if (loans.value.length > 0) {
       loans.value = updateOverdueLoans(loans.value)
@@ -845,10 +738,6 @@ const showSidebar = () => { isSidebarVisible.value = true }
                     class="p-2.5 rounded-full bg-indigo-600 text-white hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20">
               <PlusIcon class="w-5 h-5" />
             </button>
-            <button v-if="activeTab === 'salaryPayments'" @click="openSalaryForm" 
-                    class="p-2.5 rounded-full bg-indigo-600 text-white hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20">
-              <PlusIcon class="w-5 h-5" />
-            </button>
           </div>
         </div>
 
@@ -883,12 +772,6 @@ const showSidebar = () => { isSidebarVisible.value = true }
             <BanknotesIcon class="w-5 h-5 mr-2" />
             <span class="font-medium">Supplier Payments</span>
           </button>
-          <button @click="setActiveTab('salaryPayments')" 
-                  class="px-4 py-2.5 rounded-lg flex items-center transition-all duration-200"
-                  :class="activeTab === 'salaryPayments' ? 'bg-indigo-500/20 text-indigo-300 shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-700/30'">
-            <UserIcon class="w-5 h-5 mr-2" />
-            <span class="font-medium">Salary Payments</span>
-          </button>
         </div>
 
         <div class="px-6 py-4 border-b border-slate-700/50 bg-slate-800/30">
@@ -921,110 +804,13 @@ const showSidebar = () => { isSidebarVisible.value = true }
               {{ searchQuery ? 'Try adjusting your search query' : `You don't have any ${activeTab} yet` }}
             </p>
             <button 
-              v-if="activeTab !== 'supplierPayments' && activeTab !== 'salaryPayments'" 
+              v-if="activeTab !== 'supplierPayments'" 
               @click="openAddForm" 
               class="px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-medium hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20 flex items-center">
               <PlusIcon class="w-5 h-5 mr-2" />
               <span>Add {{ activeTab.slice(0, -1) }}</span>
             </button>
-            <button 
-              v-if="activeTab === 'salaryPayments'" 
-              @click="openSalaryForm" 
-              class="px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-medium hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20 flex items-center">
-              <PlusIcon class="w-5 h-5 mr-2" />
-              <span>Add Salary Payment</span>
-            </button>
           </div>
-          <div v-else-if="activeTab === 'salaryPayments'">
-            <div v-if="sortedSalaryPayments.length === 0" class="flex flex-col items-center justify-center h-full text-center p-6">
-              <div class="w-20 h-20 bg-slate-800/80 rounded-2xl flex items-center justify-center mb-5 border border-slate-700/50 shadow-xl">
-                <UserIcon class="w-10 h-10 text-slate-500" />
-              </div>
-              <h3 class="text-xl font-medium text-slate-300 mb-2">No items found</h3>
-              <p class="text-slate-500 max-w-md mb-8">
-                {{ salarySearchQuery ? 'Try adjusting your search query' : "You don't have any salary payments yet" }}
-              </p>
-              <button @click="openSalaryForm"
-                      class="px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-medium hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20 flex items-center">
-                <PlusIcon class="w-5 h-5 mr-2" />
-                <span>Add Salary Payment</span>
-              </button>
-            </div>
-            <div v-else>
-              <table class="w-full border-collapse">
-                <thead>
-                  <tr class="text-left border-b border-slate-700/50 bg-slate-800/30">
-                    <th @click="toggleSalarySort('payment_date')" class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase cursor-pointer hover:text-white">
-                      <div class="flex items-center">
-                        Date
-                        <component v-if="getSalarySortIcon('payment_date')" :is="getSalarySortIcon('payment_date')" class="w-4 h-4 ml-1" />
-                      </div>
-                    </th>
-                    <th @click="toggleSalarySort('cashier_id')" class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase cursor-pointer hover:text-white">
-                      <div class="flex items-center">
-                        Cashier
-                        <component v-if="getSalarySortIcon('cashier_id')" :is="getSalarySortIcon('cashier_id')" class="w-4 h-4 ml-1" />
-                      </div>
-                    </th>
-                    <th @click="toggleSalarySort('payment_period')" class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase cursor-pointer hover:text-white">
-                      <div class="flex items-center">
-                        Period
-                        <component v-if="getSalarySortIcon('payment_period')" :is="getSalarySortIcon('payment_period')" class="w-4 h-4 ml-1" />
-                      </div>
-                    </th>
-                    <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Base Salary</th>
-                    <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Additions</th>
-                    <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Deductions</th>
-                    <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Net Pay</th>
-                    <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Method</th>
-                    <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Invoice #</th>
-                    <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Status</th>
-                    <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Created</th>
-                    <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="item in sortedSalaryPayments" :key="item.id" class="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors">
-                    <td class="px-6 py-4 text-white font-medium">{{ formatDate(item.payment_date) }}</td>
-                    <td class="px-6 py-4 text-slate-300 font-medium">
-                      {{ item.cashier?.name || cashiers.find(c => c.id === item.cashier_id)?.name || '-' }}
-                    </td>
-                    <td class="px-6 py-4 text-slate-300">{{ item.payment_period }}</td>
-                    <td class="px-6 py-4 text-slate-300">{{ formatCurrency(item.base_salary) }}</td>
-                    <td class="px-6 py-4 text-slate-300">{{ formatCurrency(item.additions) }}</td>
-                    <td class="px-6 py-4 text-slate-300">{{ formatCurrency(item.deductions) }}</td>
-                    <td class="px-6 py-4 text-slate-300 font-medium">{{ formatCurrency(item.net_pay) }}</td>
-                    <td class="px-6 py-4 text-slate-300">{{ item.payment_method }}</td>
-                    <td class="px-6 py-4 text-slate-300">{{ item.invoice_number }}</td>
-                    <td class="px-6 py-4 text-slate-300">
-                      <span class="px-3 py-1.5 rounded-full text-xs font-medium inline-block"
-                        :class="{
-                          'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20': item.status === 'Paid',
-                          'bg-amber-500/20 text-amber-400 border border-amber-500/20': item.status !== 'Paid'
-                        }">
-                        {{ item.status }}
-                      </span>
-                    </td>
-                    <td class="px-6 py-4 text-slate-300">{{ formatDate(item.created_at) }}</td>
-                    <td class="px-6 py-4">
-                      <div class="flex justify-end space-x-2">
-                        <button @click="viewSalaryDetails(item)" class="text-cyan-400 hover:text-cyan-300 p-1.5 hover:bg-slate-700/50 rounded-lg transition-colors">
-                          <EyeIcon class="w-5 h-5" />
-                        </button>
-                        <button @click="openSalaryEditForm(item)" class="text-indigo-400 hover:text-indigo-300 p-1.5 hover:bg-slate-700/50 rounded-lg transition-colors">
-                          <PencilIcon class="w-5 h-5" />
-                        </button>
-                        <button @click="deleteSalaryPayment(item)" class="text-rose-400 hover:text-rose-300 p-1.5 hover:bg-slate-700/50 rounded-lg transition-colors">
-                          <TrashIcon class="w-5 h-5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
           <div v-else-if="activeTab === 'assets'" class="w-full">
             <table class="w-full border-collapse">
               <thead>
@@ -1327,487 +1113,6 @@ const showSidebar = () => { isSidebarVisible.value = true }
               </tbody>
             </table>
           </div>
-
-          <div v-else-if="activeTab === 'salaryPayments'" class="w-full">
-            <div v-if="sortedSalaryPayments.length === 0" class="flex flex-col items-center justify-center h-full text-center p-6">
-              <div class="w-20 h-20 bg-slate-800/80 rounded-2xl flex items-center justify-center mb-5 border border-slate-700/50 shadow-xl">
-                <UserIcon class="w-10 h-10 text-slate-500" />
-              </div>
-              <h3 class="text-xl font-medium text-slate-300 mb-2">No items found</h3>
-              <p class="text-slate-500 max-w-md mb-8">
-                {{ salarySearchQuery ? 'Try adjusting your search query' : "You don't have any salary payments yet" }}
-              </p>
-              <button @click="openSalaryForm"
-                      class="px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-medium hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20 flex items-center">
-                <PlusIcon class="w-5 h-5 mr-2" />
-                <span>Add Salary Payment</span>
-              </button>
-            </div>
-            <div v-else>
-              <div class="flex items-center justify-between mb-4">
-                <div>
-                  <div class="text-xs text-slate-400 mb-0.5">Total Salary Paid</div>
-                  <div class="text-lg font-bold text-white">{{ formatCurrency(totalSalaryPaid) }}</div>
-                </div>
-                <button @click="openSalaryForm"
-                        class="p-2.5 rounded-full bg-indigo-600 text-white hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20">
-                  <PlusIcon class="w-5 h-5" />
-                </button>
-              </div>
-              <div class="mb-4">
-                <input v-model="salarySearchQuery"
-                       type="text"
-                       placeholder="Search salary payments..."
-                       class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl pl-11 pr-4 py-2.5 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all" />
-              </div>
-              <table class="w-full border-collapse">
-                <thead>
-                  <tr class="text-left border-b border-slate-700/50 bg-slate-800/30">
-                    <th @click="toggleSalarySort('payment_date')" class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase cursor-pointer hover:text-white">
-                      <div class="flex items-center">
-                        Date
-                        <component v-if="getSalarySortIcon('payment_date')" :is="getSalarySortIcon('payment_date')" class="w-4 h-4 ml-1" />
-                      </div>
-                    </th>
-                    <th @click="toggleSalarySort('cashier_id')" class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase cursor-pointer hover:text-white">
-                      <div class="flex items-center">
-                        Cashier
-                        <component v-if="getSalarySortIcon('cashier_id')" :is="getSalarySortIcon('cashier_id')" class="w-4 h-4 ml-1" />
-                      </div>
-                    </th>
-                    <th @click="toggleSalarySort('payment_period')" class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase cursor-pointer hover:text-white">
-                      <div class="flex items-center">
-                        Period
-                        <component v-if="getSalarySortIcon('payment_period')" :is="getSalarySortIcon('payment_period')" class="w-4 h-4 ml-1" />
-                      </div>
-                    </th>
-                    <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Base Salary</th>
-                    <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Additions</th>
-                    <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Deductions</th>
-                    <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Net Pay</th>
-                    <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Method</th>
-                    <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Invoice #</th>
-                    <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Status</th>
-                    <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Created</th>
-                    <th class="px-6 py-4 text-xs font-semibold text-slate-400 uppercase text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="item in sortedSalaryPayments" :key="item.id" class="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors">
-                    <td class="px-6 py-4 text-white font-medium">{{ formatDate(item.payment_date) }}</td>
-                    <td class="px-6 py-4 text-slate-300 font-medium">
-                      {{ item.cashier?.name || cashiers.find(c => c.id === item.cashier_id)?.name || '-' }}
-                    </td>
-                    <td class="px-6 py-4 text-slate-300">{{ item.payment_period }}</td>
-                    <td class="px-6 py-4 text-slate-300">{{ formatCurrency(item.base_salary) }}</td>
-                    <td class="px-6 py-4 text-slate-300">{{ formatCurrency(item.additions) }}</td>
-                    <td class="px-6 py-4 text-slate-300">{{ formatCurrency(item.deductions) }}</td>
-                    <td class="px-6 py-4 text-slate-300 font-medium">{{ formatCurrency(item.net_pay) }}</td>
-                    <td class="px-6 py-4 text-slate-300">{{ item.payment_method }}</td>
-                    <td class="px-6 py-4 text-slate-300">{{ item.invoice_number }}</td>
-                    <td class="px-6 py-4 text-slate-300">
-                      <span class="px-3 py-1.5 rounded-full text-xs font-medium inline-block"
-                        :class="{
-                          'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20': item.status === 'Paid',
-                          'bg-amber-500/20 text-amber-400 border border-amber-500/20': item.status !== 'Paid'
-                        }">
-                        {{ item.status }}
-                      </span>
-                    </td>
-                    <td class="px-6 py-4 text-slate-300">{{ formatDate(item.created_at) }}</td>
-                    <td class="px-6 py-4">
-                      <div class="flex justify-end space-x-2">
-                        <button @click="viewSalaryDetails(item)" class="text-cyan-400 hover:text-cyan-300 p-1.5 hover:bg-slate-700/50 rounded-lg transition-colors">
-                          <EyeIcon class="w-5 h-5" />
-                        </button>
-                        <button @click="openSalaryEditForm(item)" class="text-indigo-400 hover:text-indigo-300 p-1.5 hover:bg-slate-700/50 rounded-lg transition-colors">
-                          <PencilIcon class="w-5 h-5" />
-                        </button>
-                        <button @click="deleteSalaryPayment(item)" class="text-rose-400 hover:text-rose-300 p-1.5 hover:bg-slate-700/50 rounded-lg transition-colors">
-                          <TrashIcon class="w-5 h-5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div v-if="showForm" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm">
-            <div class="bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl border border-slate-700/50 shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
-              <div class="px-6 py-4 border-b border-slate-700/50 flex items-center justify-between bg-slate-800/80">
-                <h3 class="text-lg font-medium text-white flex items-center">
-                  <span class="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center mr-3">
-                    <component :is="activeTab === 'assets' ? BuildingLibraryIcon : 
-                                activeTab === 'investments' ? BanknotesIcon : 
-                                ArrowsRightLeftIcon" 
-                              class="w-5 h-5 text-indigo-400" />
-                  </span>
-                  {{ formTitle }}
-                </h3>
-                <button @click="closeForm" class="text-slate-400 hover:text-white p-1.5 hover:bg-slate-700/50 rounded-lg transition-colors">
-                  <XMarkIcon class="w-5 h-5" />
-                </button>
-              </div>
-
-              <form @submit.prevent="handleSubmit" class="p-6">
-                <template v-if="activeTab === 'assets'">
-                  <div class="mb-5">
-                    <label class="block text-sm font-medium text-slate-300 mb-1.5">Name</label>
-                    <input v-model="formData.name" type="text" required
-                           @input="validateAssetTextField('name', formData.name)"
-                           class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all" />
-                    <div v-if="assetFieldErrors.name" class="text-rose-400 text-xs mt-1">{{ assetFieldErrors.name }}</div>
-                  </div>
-                  <div class="mb-5">
-                    <label class="block text-sm font-medium text-slate-300 mb-1.5">Type</label>
-                    <input v-model="formData.type" type="text" required
-                           @input="validateAssetTextField('type', formData.type)"
-                           class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all" />
-                    <div v-if="assetFieldErrors.type" class="text-rose-400 text-xs mt-1">{{ assetFieldErrors.type }}</div>
-                  </div>
-                  <div class="mb-5">
-                    <label class="block text-sm font-medium text-slate-300 mb-1.5">Location</label>
-                    <input v-model="formData.location" type="text" required
-                           @input="validateAssetTextField('location', formData.location)"
-                           class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all" />
-                    <div v-if="assetFieldErrors.location" class="text-rose-400 text-xs mt-1">{{ assetFieldErrors.location }}</div>
-                  </div>
-                  <div class="mb-5">
-                    <label class="block text-sm font-medium text-slate-300 mb-1.5">Value</label>
-                    <input v-model="formData.value" type="number" min="0" step="0.01" required
-                           class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all" />
-                  </div>
-                  <div v-if="formData.value && Number(formData.value) <= 0" class="text-rose-400 text-sm mt-1">
-                    Please enter a valid value greater than 0
-                  </div>
-                </template>
-
-                <template v-else-if="activeTab === 'investments'">
-                  <div class="mb-5">
-                    <label class="block text-sm font-medium text-slate-300 mb-1.5">Investor Name</label>
-                    <input v-model="formData.investor_name" type="text" required
-                           @input="validateInvestmentTextField('investor_name', formData.investor_name)"
-                           class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all" />
-                    <div v-if="investmentFieldErrors.investor_name" class="text-rose-400 text-xs mt-1">{{ investmentFieldErrors.investor_name }}</div>
-                  </div>
-                  <div class="mb-5">
-                    <label class="block text-sm font-medium text-slate-300 mb-1.5">Amount</label>
-                    <input v-model="formData.amount" type="number" min="0" step="0.01" required
-                           class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all" />
-                  </div>
-                  <div class="mb-5">
-                    <label class="block text-sm font-medium text-slate-300 mb-1.5">Investment Date</label>
-                    <input v-model="formData.investment_date" type="date" required
-                           class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all" />
-                  </div>
-                  <div class="mb-5">
-                    <label class="block text-sm font-medium text-slate-300 mb-1.5">Description</label>
-                    <textarea v-model="formData.description" rows="3"
-                              @input="validateInvestmentTextField('description', formData.description)"
-                              class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all"></textarea>
-                    <div v-if="investmentFieldErrors.description" class="text-rose-400 text-xs mt-1">{{ investmentFieldErrors.description }}</div>
-                  </div>
-                  <div v-if="formData.amount && Number(formData.amount) <= 0" class="text-rose-400 text-sm mt-1">
-                    Please enter a valid amount greater than 0
-                  </div>
-                </template>
-
-                <template v-else-if="activeTab === 'loans'">
-                  <div class="mb-5">
-                    <label class="block text-sm font-medium text-slate-300 mb-1.5">Borrower Name</label>
-                    <input v-model="formData.borrower_name" type="text" required
-                           @input="validateLoanTextField('borrower_name', formData.borrower_name)"
-                           class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all" />
-                    <div v-if="loanFieldErrors.borrower_name" class="text-rose-400 text-xs mt-1">{{ loanFieldErrors.borrower_name }}</div>
-                  </div>
-                  <div class="mb-5">
-                    <label class="block text-sm font-medium text-slate-300 mb-1.5">Amount</label>
-                    <input v-model="formData.amount" type="number" min="0" step="0.01" required
-                           class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all" />
-                  </div>
-                  <div class="mb-5">
-                    <label class="block text-sm font-medium text-slate-300 mb-1.5">Loan Date</label>
-                    <input v-model="formData.loan_date" type="date" required
-                           class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all" />
-                  </div>
-                  <div class="mb-5">
-                    <label class="block text-sm font-medium text-slate-300 mb-1.5">Due Date</label>
-                    <input v-model="formData.due_date" type="date" required
-                           class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all" />
-                  </div>
-                  <div class="mb-5">
-                    <label class="block text-sm font-medium text-slate-300 mb-1.5">Status</label>
-                    <select v-model="formData.status" required
-                            class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all">
-                      <option value="pending">Pending</option>
-                      <option value="paid">Paid</option>
-                      <option value="overdue">Overdue</option>
-                    </select>
-                  </div>
-                  <div class="mb-5">
-                    <label class="block text-sm font-medium text-slate-300 mb-1.5">Description</label>
-                    <textarea v-model="formData.description" rows="3"
-                              @input="validateLoanTextField('description', formData.description)"
-                              class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all"></textarea>
-                    <div v-if="loanFieldErrors.description" class="text-rose-400 text-xs mt-1">{{ loanFieldErrors.description }}</div>
-                  </div>
-                  <div v-if="formData.loan_date && formData.due_date && new Date(formData.loan_date) >= new Date(formData.due_date)" 
-                       class="text-rose-400 text-sm mt-1">
-                    Loan date must be before due date
-                  </div>
-                </template>
-
-                <template v-else-if="activeTab === 'dailyExpenses'">
-                  <div class="mb-5">
-                    <label class="block text-sm font-medium text-slate-300 mb-1.5">Category</label>
-                    <select v-model="formData.category" required
-                            class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all">
-                      <option value="">Select Category</option>
-                      <option value="utility bills">Utility Bills</option>
-                      <option value="transportation">Transportation</option>
-                      <option value="rent">Rent</option>
-                      <option value="maintenance">Maintenance</option>
-                      <option value="other">Other</option>
-                    </select>
-                  </div>
-                  <div v-if="formData.category === 'other'" class="mb-5">
-                    <label class="block text-sm font-medium text-slate-300 mb-1.5">Custom Category</label>
-                    <input v-model="formData.custom_category" type="text" required
-                           class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all" />
-                  </div>
-                  <div class="mb-5">
-                    <label class="block text-sm font-medium text-slate-300 mb-1.5">Description</label>
-                    <textarea v-model="formData.description" rows="3"
-                              @input="validateDailyExpensesTextField('description', formData.description)"
-                              class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all"></textarea>
-                    <div v-if="dailyExpensesFieldErrors.description" class="text-rose-400 text-xs mt-1">{{ dailyExpensesFieldErrors.description }}</div>
-                  </div>
-                  <div class="mb-5">
-                    <label class="block text-sm font-medium text-slate-300 mb-1.5">Amount</label>
-                    <input v-model="formData.amount" type="number" min="0" step="0.01" required
-                           class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all" />
-                  </div>
-                  <div class="mb-5">
-                    <label class="block text-sm font-medium text-slate-300 mb-1.5">Date</label>
-                    <input v-model="formData.date" type="date" required
-                           class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all" />
-                  </div>
-                  <div v-if="formData.amount && Number(formData.amount) <= 0" class="text-rose-400 text-sm mt-1">
-                    Please enter a valid amount greater than 0
-                  </div>
-                </template>
-
-                <div class="flex justify-end space-x-3 mt-6">
-                  <button type="button" @click="closeForm"
-                          class="px-4 py-2.5 rounded-xl border border-slate-600/50 text-slate-300 hover:text-white hover:bg-slate-700 transition-all">
-                    Cancel
-                  </button>
-                  <button type="submit"
-                          :disabled="!isFormValid || isSubmitting"
-                          :class="[
-                            'px-5 py-2.5 rounded-xl font-medium transition-all shadow-lg',
-                            isFormValid && !isSubmitting 
-                              ? 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-indigo-600/20' 
-                              : 'bg-slate-600 text-slate-300 cursor-not-allowed'
-                          ]">
-                    <span v-if="isSubmitting" class="flex items-center">
-                      <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Processing...
-                    </span>
-                    <span v-else>
-                      {{ formMode === 'add' ? 'Add' : 'Update' }}
-                    </span>
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-
-          <div v-if="showSalaryForm" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm">
-            <div class="bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl border border-slate-700/50 shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
-              <div class="px-6 py-4 border-b border-slate-700/50 flex items-center justify-between bg-slate-800/80">
-                <h3 class="text-lg font-medium text-white flex items-center">
-                  <span class="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center mr-3">
-                    <UserIcon class="w-5 h-5 text-indigo-400" />
-                  </span>
-                  {{ salaryFormMode === 'add' ? 'Add Salary Payment' : 'Edit Salary Payment' }}
-                </h3>
-                <button @click="closeSalaryForm" class="text-slate-400 hover:text-white p-1.5 hover:bg-slate-700/50 rounded-lg transition-colors">
-                  <XMarkIcon class="w-5 h-5" />
-                </button>
-              </div>
-              <form @submit.prevent="handleSalarySubmit" class="p-6">
-                <div class="mb-5">
-                  <label class="block text-sm font-medium text-slate-300 mb-1.5">Cashier</label>
-                  <select v-model="salaryFormData.cashier_id" required
-                          class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all">
-                    <option value="">Select Cashier</option>
-                    <option v-for="cashier in cashiers" :key="cashier.id" :value="cashier.id">{{ cashier.name }}</option>
-                  </select>
-                </div>
-                <div class="mb-5">
-                  <label class="block text-sm font-medium text-slate-300 mb-1.5">Payment Period</label>
-                  <select v-model="salaryFormData.payment_period" required
-                          class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all">
-                    <option value="">Select Period</option>
-                    <option value="Monthly">Monthly</option>
-                    <option value="Weekly">Weekly</option>
-                    <option value="Daily">Daily</option>
-                  </select>
-                </div>
-                <div class="mb-5">
-                  <label class="block text-sm font-medium text-slate-300 mb-1.5">Payment Date</label>
-                  <input v-model="salaryFormData.payment_date" type="date" required
-                         class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all" />
-                </div>
-                <div class="mb-5">
-                  <label class="block text-sm font-medium text-slate-300 mb-1.5">Base Salary</label>
-                  <input v-model="salaryFormData.base_salary" type="number" min="0" step="0.01" required
-                         @input="handleSalaryFormChange"
-                         class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all" />
-                </div>
-                <div class="mb-5">
-                  <label class="block text-sm font-medium text-slate-300 mb-1.5">Additions (OT, Bonus)</label>
-                  <input v-model="salaryFormData.additions" type="number" min="0" step="0.01"
-                         @input="handleSalaryFormChange"
-                         class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all" />
-                </div>
-                <div class="mb-5">
-                  <label class="block text-sm font-medium text-slate-300 mb-1.5">Deductions (Advance, Leave)</label>
-                  <input v-model="salaryFormData.deductions" type="number" min="0" step="0.01"
-                         @input="handleSalaryFormChange"
-                         class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all" />
-                </div>
-                <div class="mb-5">
-                  <label class="block text-sm font-medium text-slate-300 mb-1.5">Net Pay</label>
-                  <input v-model="salaryFormData.net_pay" type="number" min="0" step="0.01" readonly
-                         class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all" />
-                </div>
-                <div class="mb-5">
-                  <label class="block text-sm font-medium text-slate-300 mb-1.5">Payment Method</label>
-                  <select v-model="salaryFormData.payment_method" required
-                          class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all">
-                    <option value="cash">Cash</option>
-                    <option value="bank">Bank Transfer</option>
-                    <option value="cheque">Cheque</option>
-                  </select>
-                </div>
-                <div class="mb-5">
-                  <label class="block text-sm font-medium text-slate-300 mb-1.5">Notes</label>
-                  <textarea v-model="salaryFormData.notes" rows="2"
-                            class="w-full bg-slate-800/80 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all"></textarea>
-                </div>
-                <div class="flex justify-end space-x-3 mt-6">
-                  <button type="button" @click="closeSalaryForm"
-                          class="px-4 py-2.5 rounded-xl border border-slate-600/50 text-slate-300 hover:text-white hover:bg-slate-700 transition-all">
-                    Cancel
-                  </button>
-                  <button type="submit"
-                          :disabled="salaryIsSubmitting"
-                          :class=" [
-                            'px-5 py-2.5 rounded-xl font-medium transition-all shadow-lg',
-                            !salaryIsSubmitting 
-                              ? 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-indigo-600/20' 
-                              : 'bg-slate-600 text-slate-300 cursor-not-allowed'
-                          ]">
-                    <span v-if="salaryIsSubmitting" class="flex items-center">
-                      <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Processing...
-                    </span>
-                    <span v-else>
-                      {{ salaryFormMode === 'add' ? 'Add' : 'Update' }}
-                    </span>
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-
-          <div v-if="showSalaryViewModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div class="bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl w-full max-w-xl p-6 shadow-2xl border border-slate-700/50 max-h-[90vh] overflow-auto">
-              <div class="flex justify-between items-center mb-6 border-b border-slate-700/50 pb-4">
-                <div class="flex items-center space-x-3">
-                  <div class="w-10 h-10 rounded-xl bg-cyan-500/20 flex items-center justify-center">
-                    <DocumentTextIcon class="w-6 h-6 text-cyan-400" />
-                  </div>
-                  <h2 class="text-xl font-semibold text-white">
-                    <span class="text-cyan-400">Salary</span> Payslip
-                  </h2>
-                </div>
-                <button @click="showSalaryViewModal = false"
-                        class="text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 p-2 rounded-lg transition-colors">
-                  <XMarkIcon class="w-5 h-5" />
-                </button>
-              </div>
-              <div v-if="viewingSalaryItem" class="space-y-5">
-                <div class="bg-slate-800/50 backdrop-blur-sm p-5 rounded-xl border border-slate-700/30 space-y-4">
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Invoice #</span>
-                    <p class="text-white mt-1.5 font-medium">{{ viewingSalaryItem.invoice_number || viewingSalaryItem.id }}</p>
-                  </div>
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Cashier</span>
-                    <p class="text-white mt-1.5 font-medium">{{ cashiers.find(c => c.id === viewingSalaryItem.cashier_id)?.name || '-' }}</p>
-                  </div>
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Payment Date</span>
-                    <p class="text-white mt-1.5">{{ formatDate(viewingSalaryItem.payment_date) }}</p>
-                  </div>
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Period</span>
-                    <p class="text-white mt-1.5">{{ viewingSalaryItem.payment_period }}</p>
-                  </div>
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Base Salary</span>
-                    <p class="text-white mt-1.5">{{ formatCurrency(viewingSalaryItem.base_salary) }}</p>
-                  </div>
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Additions</span>
-                    <p class="text-white mt-1.5">{{ formatCurrency(viewingSalaryItem.additions) }}</p>
-                  </div>
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Deductions</span>
-                    <p class="text-white mt-1.5">{{ formatCurrency(viewingSalaryItem.deductions) }}</p>
-                  </div>
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Net Pay</span>
-                    <p class="text-white mt-1.5 font-bold">{{ formatCurrency(viewingSalaryItem.net_pay) }}</p>
-                  </div>
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Payment Method</span>
-                    <p class="text-white mt-1.5">{{ viewingSalaryItem.payment_method }}</p>
-                  </div>
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Notes</span>
-                    <p class="text-white mt-1.5">{{ viewingSalaryItem.notes || '-' }}</p>
-                  </div>
-                  <div>
-                    <span class="text-sm font-medium text-cyan-400">Status</span>
-                    <p class="mt-1.5">
-                      <span class="px-3 py-1.5 rounded-full text-xs font-medium inline-block bg-emerald-500/20 text-emerald-400 border border-emerald-500/20">
-                        Paid
-                      </span>
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div class="flex justify-end mt-6 pt-4 border-t border-slate-700/50">
-                <button @click="showSalaryViewModal = false"
-                        class="px-5 py-2.5 bg-slate-700 text-white rounded-xl hover:bg-slate-600 transition-all shadow-lg flex items-center">
-                  <XMarkIcon class="w-5 h-5 mr-2" />
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
 
         <div v-if="showForm" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm">
@@ -2004,76 +1309,188 @@ const showSidebar = () => { isSidebarVisible.value = true }
           </div>
         </div>
 
-        <div v-if="showSalaryViewModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div v-if="showViewModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div class="bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl w-full max-w-xl p-6 shadow-2xl border border-slate-700/50 max-h-[90vh] overflow-auto">
             <div class="flex justify-between items-center mb-6 border-b border-slate-700/50 pb-4">
               <div class="flex items-center space-x-3">
                 <div class="w-10 h-10 rounded-xl bg-cyan-500/20 flex items-center justify-center">
-                  <DocumentTextIcon class="w-6 h-6 text-cyan-400" />
+                  <EyeIcon class="w-6 h-6 text-cyan-400" />
                 </div>
                 <h2 class="text-xl font-semibold text-white">
-                  <span class="text-cyan-400">Salary</span> Payslip
+                  <span class="text-cyan-400">{{ activeTab.slice(0, -1) }}</span> Details
                 </h2>
               </div>
-              <button @click="showSalaryViewModal = false"
+              <button @click="showViewModal = false"
                       class="text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 p-2 rounded-lg transition-colors">
                 <XMarkIcon class="w-5 h-5" />
               </button>
             </div>
-            <div v-if="viewingSalaryItem" class="space-y-5">
-              <div class="bg-slate-800/50 backdrop-blur-sm p-5 rounded-xl border border-slate-700/30 space-y-4">
-                <div>
-                  <span class="text-sm font-medium text-cyan-400">Invoice #</span>
-                  <p class="text-white mt-1.5 font-medium">{{ viewingSalaryItem.invoice_number || viewingSalaryItem.id }}</p>
+
+            <div class="space-y-5" v-if="viewingItem">
+              <template v-if="activeTab === 'assets'">
+                <div class="bg-slate-800/50 backdrop-blur-sm p-5 rounded-xl border border-slate-700/30 space-y-4">
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Name</span>
+                    <p class="text-white mt-1.5 font-medium">{{ viewingItem.name }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Type</span>
+                    <p class="text-white mt-1.5">{{ viewingItem.type }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Location</span>
+                    <p class="text-white mt-1.5">{{ viewingItem.location }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Value</span>
+                    <p class="text-white mt-1.5 font-medium">{{ formatCurrency(viewingItem.value) }}</p>
+                  </div>
                 </div>
-                <div>
-                  <span class="text-sm font-medium text-cyan-400">Cashier</span>
-                  <p class="text-white mt-1.5 font-medium">{{ cashiers.find(c => c.id === viewingSalaryItem.cashier_id)?.name || '-' }}</p>
+              </template>
+
+              <template v-if="activeTab === 'investments'">
+                <div class="bg-slate-800/50 backdrop-blur-sm p-5 rounded-xl border border-slate-700/30 space-y-4">
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Investor Name</span>
+                    <p class="text-white mt-1.5 font-medium">{{ viewingItem.investor_name }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Amount</span>
+                    <p class="text-white mt-1.5 font-medium">{{ formatCurrency(viewingItem.amount) }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Investment Date</span>
+                    <p class="text-white mt-1.5">{{ formatDate(viewingItem.investment_date) }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Description</span>
+                    <p class="text-white mt-1.5">{{ viewingItem.description || 'No description provided' }}</p>
+                  </div>
                 </div>
-                <div>
-                  <span class="text-sm font-medium text-cyan-400">Payment Date</span>
-                  <p class="text-white mt-1.5">{{ formatDate(viewingSalaryItem.payment_date) }}</p>
+              </template>
+
+              <template v-if="activeTab === 'loans'">
+                <div class="bg-slate-800/50 backdrop-blur-sm p-5 rounded-xl border border-slate-700/30 space-y-4">
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Borrower Name</span>
+                    <p class="text-white mt-1.5 font-medium">{{ viewingItem.borrower_name }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Amount</span>
+                    <p class="text-white mt-1.5 font-medium">{{ formatCurrency(viewingItem.amount) }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Loan Date</span>
+                    <p class="text-white mt-1.5">{{ formatDate(viewingItem.loan_date) }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Due Date</span>
+                    <p class="text-white mt-1.5">{{ formatDate(viewingItem.due_date) }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Status</span>
+                    <p class="mt-1.5">
+                      <span class="px-3 py-1.5 rounded-full text-xs font-medium inline-block"
+                            :class="{
+                              'bg-amber-500/20 text-amber-400 border border-amber-500/20': viewingItem.status === 'pending',
+                              'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20': viewingItem.status === 'paid',
+                              'bg-rose-500/20 text-rose-400 border border-rose-500/20': viewingItem.status === 'overdue'
+                            }">
+                        {{ viewingItem.status.charAt(0).toUpperCase() + viewingItem.status.slice(1) }}
+                      </span>
+                    </p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Description</span>
+                    <p class="text-white mt-1.5">{{ viewingItem.description || 'No description provided' }}</p>
+                  </div>
                 </div>
-                <div>
-                  <span class="text-sm font-medium text-cyan-400">Period</span>
-                  <p class="text-white mt-1.5">{{ viewingSalaryItem.payment_period }}</p>
+              </template>
+
+              <template v-if="activeTab === 'dailyExpenses'">
+                <div class="bg-slate-800/50 backdrop-blur-sm p-5 rounded-xl border border-slate-700/30 space-y-4">
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Category</span>
+                    <p class="text-white mt-1.5 font-medium">{{ viewingItem.category }}</p>
+                  </div>
+                  <div v-if="viewingItem.custom_category">
+                    <span class="text-sm font-medium text-cyan-400">Custom Category</span>
+                    <p class="text-white mt-1.5">{{ viewingItem.custom_category }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Description</span>
+                    <p class="text-white mt-1.5">{{ viewingItem.description || 'No description provided' }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Amount</span>
+                    <p class="text-white mt-1.5 font-medium">{{ formatCurrency(viewingItem.amount) }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Date</span>
+                    <p class="text-white mt-1.5">{{ formatDate(viewingItem.date) }}</p>
+                  </div>
                 </div>
-                <div>
-                  <span class="text-sm font-medium text-cyan-400">Base Salary</span>
-                  <p class="text-white mt-1.5">{{ formatCurrency(viewingSalaryItem.base_salary) }}</p>
+              </template>
+
+              <template v-if="activeTab === 'supplierPayments'">
+                <div class="bg-slate-800/50 backdrop-blur-sm p-5 rounded-xl border border-slate-700/30 space-y-4">
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Supplier</span>
+                    <p class="text-white mt-1.5 font-medium">{{ viewingItem.supplier?.name || '-' }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Product</span>
+                    <p class="text-white mt-1.5">{{ viewingItem.product?.name || '-' }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Total Cost</span>
+                    <p class="text-white mt-1.5 font-medium">{{ formatCurrency(viewingItem.total_cost) }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Remaining Balance</span>
+                    <p class="text-white mt-1.5 font-medium">{{ formatCurrency(viewingItem.remaining_balance) }}</p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Status</span>
+                    <p class="mt-1.5">
+                      <span class="px-3 py-1.5 rounded-full text-xs font-medium inline-block"
+                            :class="{
+                              'bg-amber-500/20 text-amber-400 border border-amber-500/20': viewingItem.payment_status === 'advance',
+                              'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20': viewingItem.payment_status === 'full'
+                            }">
+                        {{ viewingItem.payment_status.charAt(0).toUpperCase() + viewingItem.payment_status.slice(1) }}
+                      </span>
+                    </p>
+                  </div>
+                  <div>
+                    <span class="text-sm font-medium text-cyan-400">Transactions</span>
+                    <table class="w-full mt-2 text-sm">
+                      <thead>
+                        <tr>
+                          <th class="text-left text-slate-400 font-semibold py-1">Amount Paid</th>
+                          <th class="text-left text-slate-400 font-semibold py-1">Method</th>
+                          <th class="text-left text-slate-400 font-semibold py-1">Check #</th>
+                          <th class="text-left text-slate-400 font-semibold py-1">Bank</th>
+                          <th class="text-left text-slate-400 font-semibold py-1">Paid At</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="tx in viewingItem.transactions" :key="tx.id">
+                          <td class="py-1 text-white">{{ formatCurrency(tx.amount_paid) }}</td>
+                          <td class="py-1 text-white">{{ tx.payment_method }}</td>
+                          <td class="py-1 text-white">{{ tx.check_number || '-' }}</td>
+                          <td class="py-1 text-white">{{ tx.bank_name || '-' }}</td>
+                          <td class="py-1 text-white">{{ formatDate(tx.paid_at) }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-                <div>
-                  <span class="text-sm font-medium text-cyan-400">Additions</span>
-                  <p class="text-white mt-1.5">{{ formatCurrency(viewingSalaryItem.additions) }}</p>
-                </div>
-                <div>
-                  <span class="text-sm font-medium text-cyan-400">Deductions</span>
-                  <p class="text-white mt-1.5">{{ formatCurrency(viewingSalaryItem.deductions) }}</p>
-                </div>
-                <div>
-                  <span class="text-sm font-medium text-cyan-400">Net Pay</span>
-                  <p class="text-white mt-1.5 font-bold">{{ formatCurrency(viewingSalaryItem.net_pay) }}</p>
-                </div>
-                <div>
-                  <span class="text-sm font-medium text-cyan-400">Payment Method</span>
-                  <p class="text-white mt-1.5">{{ viewingSalaryItem.payment_method }}</p>
-                </div>
-                <div>
-                  <span class="text-sm font-medium text-cyan-400">Notes</span>
-                  <p class="text-white mt-1.5">{{ viewingSalaryItem.notes || '-' }}</p>
-                </div>
-                <div>
-                  <span class="text-sm font-medium text-cyan-400">Status</span>
-                  <p class="mt-1.5">
-                    <span class="px-3 py-1.5 rounded-full text-xs font-medium inline-block bg-emerald-500/20 text-emerald-400 border border-emerald-500/20">
-                      Paid
-                    </span>
-                  </p>
-                </div>
-              </div>
+              </template>
             </div>
+
             <div class="flex justify-end mt-6 pt-4 border-t border-slate-700/50">
-              <button @click="showSalaryViewModal = false"
+              <button @click="showViewModal = false"
                       class="px-5 py-2.5 bg-slate-700 text-white rounded-xl hover:bg-slate-600 transition-all shadow-lg flex items-center">
                 <XMarkIcon class="w-5 h-5 mr-2" />
                 Close
