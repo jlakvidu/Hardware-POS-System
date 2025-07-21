@@ -550,11 +550,18 @@ const openEditForm = (item) => {
       date: item.date
     }
   } else if (activeTab.value === 'employerPayments') {
+    let paymentDate = item.payment_date
+    if (paymentDate instanceof Date) {
+      paymentDate = paymentDate.toISOString().split('T')[0]
+    } else if (typeof paymentDate === 'string' && paymentDate.length > 10) {
+      // If it's a string with time, convert to date string
+      paymentDate = new Date(paymentDate).toISOString().split('T')[0]
+    }
     formData.value = {
       cashier_id: item.cashier_id || '',
       salary_amount: item.salary_amount || '',
       payment_duration: item.payment_duration || '',
-      payment_date: item.payment_date || new Date().toISOString().split('T')[0],
+      payment_date: paymentDate || new Date().toISOString().split('T')[0],
       payment_method: item.payment_method || 'cash',
       notes: item.notes || ''
     }
